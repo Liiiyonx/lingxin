@@ -1,0 +1,644 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聆心 v3.2 — 高校 AI 心理辅助平台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/main.css?v=4.3">
+    <link rel="preload" as="script" href="/static/vue.global.prod.js?v=4.1">
+    <style>
+        /* 情绪网络图 */
+        .network-legend{display:flex;align-items:center;gap:12px}
+        .network-legend-item{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-secondary,#64748b)}
+        .network-legend-item i{display:inline-block;width:9px;height:9px;border-radius:50%}
+        .network-filter-bar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border-color,#e2e8f0);flex-wrap:wrap}
+        .network-filter-chip{padding:5px 12px;border-radius:16px;border:1px solid var(--border-color,#e2e8f0);background:var(--bg-secondary,#fff);font-size:12px;cursor:pointer;transition:all .18s;color:var(--text-secondary,#64748b)}
+        .network-filter-chip b{font-weight:700;color:var(--text-primary,#0f172a)}
+        .network-filter-chip.active{background:var(--brand-50,#eef2ff);border-color:var(--brand-500,#6366f1);color:var(--brand-600,#4f46e5)}
+        .network-filter-chip:hover{transform:translateY(-1px)}
+        .network-canvas-wrap{height:calc(100vh - 220px);min-height:420px;width:100%}
+        .network-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted,#94a3b8);font-size:14px;pointer-events:none}
+        /* AI 话术推荐 */
+        .guidance-risk-tag{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600}
+        .guidance-category{margin-bottom:12px;padding:10px 12px;border-radius:10px;background:var(--bg-tertiary,#f1f5f9);border-left:3px solid var(--gc,#6366f1)}
+        .guidance-cat-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+        .guidance-cat-icon{font-size:16px}
+        .guidance-cat-name{font-weight:700;color:var(--gc,#6366f1);font-size:13px}
+        .guidance-cat-desc{font-size:11px;color:var(--text-muted,#94a3b8)}
+        .guidance-script{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:8px;background:var(--bg-secondary,#fff);margin-bottom:5px;border:1px solid var(--border-color,#e2e8f0)}
+        .guidance-script-text{flex:1;line-height:1.6;font-size:13px}
+        .guidance-fill-btn{flex-shrink:0;padding:3px 10px;border-radius:8px;border:none;background:var(--brand-gradient,linear-gradient(135deg,#6366f1,#8b5cf6));color:#fff;font-size:12px;cursor:pointer;transition:all .15s}
+        .guidance-fill-btn:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(99,102,241,.35)}
+    </style>
+</head>
+<body>
+<a href="#main-content" class="skip-to-content">跳到主内容</a>
+<div id="app">
+
+    <!-- ═══════════ 登录页 ═══════════ -->
+    <div v-if="!isLoggedIn" class="auth-layout">
+        <div class="auth-bg">
+            <div class="auth-bg-particles">
+                <div class="particle"></div><div class="particle"></div><div class="particle"></div><div class="particle"></div>
+                <div class="particle"></div><div class="particle"></div><div class="particle"></div><div class="particle"></div>
+            </div>
+            <div class="auth-bg-content">
+                <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style="opacity:0.9">
+                    <circle cx="40" cy="40" r="36" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+                    <path d="M25 40c0-8.28 6.72-15 15-15s15 6.72 15 15" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M18 40c0-12.15 9.85-22 22-22s22 9.85 22 22" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <h1>聆心</h1>
+                <p>聆听心声，智慧护航<br>高校 AI 心理辅助平台</p>
+            </div>
+        </div>
+        <div class="auth-panel">
+            <div class="auth-card">
+                <h2>欢迎使用聆心</h2>
+                <p class="auth-subtitle">登录您的账号以继续</p>
+
+                <div class="auth-tabs">
+                    <button class="auth-tab" :class="{active:loginType==='staff'}" @click="loginType='staff'">老师/管理员</button>
+                    <button class="auth-tab" :class="{active:loginType==='student'}" @click="loginType='student'">学生登录</button>
+                </div>
+
+                <!-- 教师端登录 -->
+                <div v-if="loginType==='staff'">
+                    <div class="form-group"><label>用户名</label><input class="input" v-model="loginForm.username" placeholder="请输入用户名" @keyup.enter="handleLogin"></div>
+                    <div class="form-group"><label>密码</label><input class="input" v-model="loginForm.password" type="password" placeholder="请输入密码" @keyup.enter="handleLogin"></div>
+                    <button class="btn btn-primary w-full" @click="handleLogin" :disabled="loginLoading">{{ loginLoading ? '登录中...' : '登 录' }}</button>
+                    <div class="auth-tip">
+                        <div class="auth-tip-title">管理员 / 学工处（点击快速填充）</div>
+                        <div class="auth-tip-accounts">
+                            <span class="auth-tip-chip" v-for="u in testAccounts.staff" :key="u.username" @click="fillStaffAccount(u)">{{ u.display_name }}（{{ u.username }}）</span>
+                        </div>
+                        <div class="auth-tip-title mt-1">辅导员 / 老师（密码均为 counsel123）</div>
+                        <div class="auth-tip-accounts" style="max-height:170px;overflow-y:auto">
+                            <span class="auth-tip-chip" v-for="u in testAccounts.counselors" :key="u.username" @click="fillCounselorAccount(u)">{{ u.display_name }}（{{ u.username }}）· {{ u.student_count }}名学生</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 学生端登录 -->
+                <div v-else>
+                    <div v-if="!showStudentRegister">
+                        <div class="form-group"><label>学号</label><input class="input" v-model="studentLoginForm.student_id" placeholder="请输入学号" @keyup.enter="handleStudentLogin"></div>
+                        <div class="form-group"><label>密码</label><input class="input" v-model="studentLoginForm.password" type="password" placeholder="请输入密码" @keyup.enter="handleStudentLogin"></div>
+                        <button class="btn btn-primary w-full" @click="handleStudentLogin" :disabled="loginLoading">{{ loginLoading ? '登录中...' : '登 录' }}</button>
+                        <p class="text-center mt-4 text-sm text-muted">首次使用？<a href="#" @click.prevent="showStudentRegister=true" class="text-brand font-semibold">点击注册</a></p>
+                        <div class="auth-tip">
+                            <div class="auth-tip-title">测试学生（密码均为 123456，点击快速填充）</div>
+                            <div class="auth-tip-accounts" style="max-height:180px;overflow-y:auto">
+                                <template v-for="u in testAccounts.counselors" :key="u.username">
+                                    <span class="auth-tip-chip" v-for="s in u.students" :key="s.student_id" @click="fillStudentAccount(s)">{{ s.student_id }} {{ s.name }}（{{ u.display_name }}）</span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else>
+                        <div class="form-group"><label>学号</label><input class="input" v-model="studentRegisterForm.student_id" placeholder="请输入学号"></div>
+                        <div class="form-group"><label>姓名</label><input class="input" v-model="studentRegisterForm.name" placeholder="请输入姓名"></div>
+                        <div class="form-group"><label>密码</label><input class="input" v-model="studentRegisterForm.password" type="password" placeholder="设置密码（至少6位）"></div>
+                        <div class="form-group"><label>确认密码</label><input class="input" v-model="studentRegisterForm.confirmPassword" type="password" placeholder="再次输入密码"></div>
+                        <button class="btn btn-primary w-full" @click="handleStudentRegister" :disabled="loginLoading">{{ loginLoading ? '注册中...' : '注 册' }}</button>
+                        <p class="text-center mt-4 text-sm text-muted">已有账号？<a href="#" @click.prevent="showStudentRegister=false" class="text-brand font-semibold">返回登录</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ 主布局 ═══════════ -->
+    <div v-else class="app-shell" id="main-content">
+        <div class="sidebar-overlay" v-if="sidebarMobileOpen" @click="sidebarMobileOpen=false"></div>
+
+        <!-- 侧边栏 -->
+        <aside class="app-sidebar" :class="{collapsed:sidebarCollapsed,'mobile-open':sidebarMobileOpen}">
+            <div class="sidebar-header">
+                <svg class="sidebar-logo" viewBox="0 0 32 32" fill="none">
+                    <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2" opacity="0.25"/>
+                    <path d="M11 16c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <div class="sidebar-brand">聆<span>心</span></div>
+            </div>
+            <nav class="sidebar-nav">
+                <!-- ═══ 管理员 / 学工处 ═══ -->
+                <template v-if="currentUser.role==='super_admin'||currentUser.role==='student_affairs'">
+                    <div class="nav-section">
+                        <div class="nav-section-title">监测中心</div>
+                        <div class="nav-item" :class="{active:page==='emotionBoard'}" @click="page='emotionBoard';loadEmotionDashboard()" data-tooltip="情绪看板"><span class="nav-item-icon" v-html="Icons.render('chart')"></span><span class="nav-item-text">全校情绪看板</span></div>
+                        <div class="nav-item" :class="{active:page==='emotionNetwork'}" @click="page='emotionNetwork';loadEmotionNetwork()" data-tooltip="情绪网络图"><span class="nav-item-icon" v-html="Icons.render('network')"></span><span class="nav-item-text">全校情绪网络图</span></div>
+                        <div class="nav-item" :class="{active:page==='alerts'}" @click="page='alerts';loadAlerts()" data-tooltip="风险预警"><span class="nav-item-icon" v-html="Icons.render('alert')"></span><span class="nav-item-text">全校风险预警</span><span class="nav-badge" v-if="alerts.filter(function(a){return a.status==='pending'}).length">{{ alerts.filter(function(a){return a.status==='pending'}).length }}</span></div>
+                    </div>
+                    <div class="nav-section">
+                        <div class="nav-section-title">管理</div>
+                        <div class="nav-item" :class="{active:page==='students'}" @click="page='students';loadStudents()" data-tooltip="学生管理"><span class="nav-item-icon" v-html="Icons.render('students')"></span><span class="nav-item-text">全校学生管理</span></div>
+                        <div class="nav-item" :class="{active:page==='knowledge'}" @click="page='knowledge';loadKbStats()" data-tooltip="知识库"><span class="nav-item-icon" v-html="Icons.render('knowledge')"></span><span class="nav-item-text">知识库管理</span></div>
+                    </div>
+                    <div class="nav-section">
+                        <div class="nav-section-title">系统</div>
+                        <div class="nav-item" :class="{active:page==='system'}" @click="page='system'" data-tooltip="系统管理"><span class="nav-item-icon" v-html="Icons.render('settings')"></span><span class="nav-item-text">系统管理</span></div>
+                    </div>
+                </template>
+                <!-- ═══ 辅导员 / 老师 ═══ -->
+                <template v-else-if="currentUser.role==='counselor'">
+                    <div class="nav-section">
+                        <div class="nav-section-title">工作台</div>
+                        <div class="nav-item" :class="{active:page==='dashboard'}" @click="page='dashboard'" data-tooltip="今日工作台"><span class="nav-item-icon" v-html="Icons.render('dashboard')"></span><span class="nav-item-text">今日工作台</span></div>
+                        <div class="nav-item" :class="{active:page==='emotionBoard'}" @click="page='emotionBoard';loadEmotionDashboard()" data-tooltip="情绪看板"><span class="nav-item-icon" v-html="Icons.render('chart')"></span><span class="nav-item-text">班级情绪看板</span></div>
+                        <div class="nav-item" :class="{active:page==='emotionNetwork'}" @click="page='emotionNetwork';loadEmotionNetwork()" data-tooltip="情绪网络图"><span class="nav-item-icon" v-html="Icons.render('network')"></span><span class="nav-item-text">情绪网络图</span></div>
+                    </div>
+                    <div class="nav-section">
+                        <div class="nav-section-title">沟通</div>
+                        <div class="nav-item" :class="{active:page==='teacherChat'}" @click="page='teacherChat';loadMessageContacts()" data-tooltip="师生对话"><span class="nav-item-icon" v-html="Icons.render('chat')"></span><span class="nav-item-text">师生对话</span><span class="nav-badge" v-if="teacherUnreadCount">{{ teacherUnreadCount }}</span></div>
+                    </div>
+                    <div class="nav-section">
+                        <div class="nav-section-title">工具</div>
+                        <div class="nav-item" :class="{active:page==='classMeeting'}" @click="page='classMeeting'" data-tooltip="班会策划"><span class="nav-item-icon" v-html="Icons.render('calendar')"></span><span class="nav-item-text">班会策划</span></div>
+                        <div class="nav-item" :class="{active:page==='docWriting'}" @click="page='docWriting'" data-tooltip="公文写作"><span class="nav-item-icon" v-html="Icons.render('knowledge')"></span><span class="nav-item-text">公文写作</span></div>
+                        <div class="nav-item" :class="{active:page==='reminders'}" @click="page='reminders';loadReminders()" data-tooltip="提醒中心"><span class="nav-item-icon" v-html="Icons.render('bell')"></span><span class="nav-item-text">提醒中心</span></div>
+                    </div>
+                    <div class="nav-section">
+                        <div class="nav-section-title">管理</div>
+                        <div class="nav-item" :class="{active:page==='alerts'}" @click="page='alerts';loadAlerts()" data-tooltip="风险预警"><span class="nav-item-icon" v-html="Icons.render('alert')"></span><span class="nav-item-text">本班风险预警</span><span class="nav-badge" v-if="alerts.filter(function(a){return a.status==='pending'}).length">{{ alerts.filter(function(a){return a.status==='pending'}).length }}</span></div>
+                        <div class="nav-item" :class="{active:page==='students'}" @click="page='students';loadStudents()" data-tooltip="学生管理"><span class="nav-item-icon" v-html="Icons.render('students')"></span><span class="nav-item-text">本班学生管理</span></div>
+                        <div class="nav-item" :class="{active:page==='knowledge'}" @click="page='knowledge';loadKbStats()" data-tooltip="知识库"><span class="nav-item-icon" v-html="Icons.render('knowledge')"></span><span class="nav-item-text">知识库</span></div>
+                    </div>
+                    <div class="nav-section">
+                        <div class="nav-section-title">系统</div>
+                        <div class="nav-item" :class="{active:page==='system'}" @click="page='system'" data-tooltip="系统管理"><span class="nav-item-icon" v-html="Icons.render('settings')"></span><span class="nav-item-text">系统管理</span></div>
+                    </div>
+                </template>
+                <!-- ═══ 学生 ═══ -->
+                <template v-else>
+                    <div class="nav-section"><div class="nav-section-title">首页</div>
+                        <div class="nav-item" :class="{active:page==='studentHome'}" @click="page='studentHome'" data-tooltip="我的首页"><span class="nav-item-icon" v-html="Icons.render('home')"></span><span class="nav-item-text">我的首页</span></div></div>
+                    <div class="nav-section"><div class="nav-section-title">沟通</div>
+                        <div class="nav-item" :class="{active:page==='studentChat'}" @click="page='studentChat';loadMessageContacts()" data-tooltip="联系老师"><span class="nav-item-icon" v-html="Icons.render('chat')"></span><span class="nav-item-text">联系老师</span><span class="nav-badge" v-if="studentUnreadCount">{{ studentUnreadCount }}</span></div></div>
+                    <div class="nav-section"><div class="nav-section-title">服务</div>
+                        <div class="nav-item" :class="{active:page==='studentAssessment'}" @click="page='studentAssessment';initAssessment()" data-tooltip="心理测评"><span class="nav-item-icon" v-html="Icons.render('chart')"></span><span class="nav-item-text">心理测评</span></div>
+                        <div class="nav-item" :class="{active:page==='studentAppointment'}" @click="page='studentAppointment';loadAppointments()" data-tooltip="预约咨询"><span class="nav-item-icon" v-html="Icons.render('calendar')"></span><span class="nav-item-text">预约咨询</span></div></div>
+                    <div class="nav-section"><div class="nav-section-title">个人</div>
+                        <div class="nav-item" :class="{active:page==='studentProfile'}" @click="page='studentProfile'" data-tooltip="个人中心"><span class="nav-item-icon" v-html="Icons.render('user')"></span><span class="nav-item-text">个人中心</span></div></div>
+                </template>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="sidebar-avatar">{{ (currentUser.display_name||currentUser.username||'?')[0] }}</div>
+                <div class="sidebar-user-info"><div class="sidebar-user-name">{{ currentUser.display_name||currentUser.username }}</div><div class="sidebar-user-role">{{ roleLabel }}</div></div>
+            </div>
+        </aside>
+
+        <!-- 主区域 -->
+        <div class="app-main">
+            <header class="app-topbar">
+                <button class="topbar-toggle" @click="toggleSidebar" aria-label="菜单">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <div class="topbar-breadcrumb"><span>{{ pageTitle }}</span></div>
+                <div class="topbar-spacer"></div>
+                <div class="topbar-actions">
+                    <button class="topbar-btn" @click="toggleTheme" :title="isDarkMode?'浅色模式':'深色模式'" aria-label="切换主题">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle v-if="!isDarkMode" cx="12" cy="12" r="5"/><path v-if="!isDarkMode" d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/><path v-if="isDarkMode" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                    </button>
+                    <button class="topbar-btn" @click="handleLogout" title="退出登录" aria-label="退出">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    </button>
+                </div>
+            </header>
+
+            <main class="app-content">
+                <div v-if="incomingStudentCall && currentUser.role==='student' && page!=='studentChat'" class="global-call-banner flex items-center justify-between gap-3">
+                    <span class="font-semibold">&#128222; {{ incomingStudentCall.teacher_name||'&#32769;&#24072;' }} &#36992;&#35831;&#20320;&#35270;&#39057;&#36890;&#35805;</span>
+                    <div class="flex gap-2"><button @click="acceptStudentCall" class="btn btn-success btn-xs">&#25509;&#21548;</button><button @click="rejectStudentCall" class="btn btn-danger btn-xs">&#25298;&#32477;</button></div>
+                </div>
+                <div v-if="incomingCall && currentUser.role==='counselor' && page!=='teacherChat'" class="global-call-banner flex items-center justify-between gap-3">
+                    <span class="font-semibold">&#128222; {{ incomingCall.student_name||'&#23398;&#29983;' }} &#27491;&#22312;&#21628;&#21483;...</span>
+                    <div class="flex gap-2"><button @click="acceptVideoCall" class="btn btn-success btn-xs">&#25509;&#21548;</button><button @click="rejectVideoCall" class="btn btn-danger btn-xs">&#25298;&#32477;</button></div>
+                </div>
+
+                <!-- ══════ 今日工作台 ══════ -->
+                <div v-if="page==='dashboard'" class="fade-in">
+                    <div class="page-header">
+                        <div><h3>今日工作台</h3><p class="text-muted text-sm mt-1">{{ wp.date }} {{ wp.weekday }} · {{ wp.todo_count }} 项待办</p></div>
+                        <div class="flex gap-2">
+                            <button class="btn btn-primary btn-sm" @click="showAddTodo=true">+ 添加待办</button>
+                            <button class="btn btn-outline btn-sm" @click="loadWorkplan()">🔄 刷新</button>
+                        </div>
+                    </div>
+                    <!-- 统计卡片 -->
+                    <div class="stats-row">
+                        <div class="stat-card blue" @click="page='students'"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('students',20)"></div><div class="stat-label">学生总数</div><div class="stat-value">{{ wp.student_summary.total||0 }}</div><div class="stat-sub">点击查看详情 →</div></div>
+                        <div class="stat-card red"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('alert',20)"></div><div class="stat-label">高风险学生</div><div class="stat-value">{{ wp.student_summary.high_risk||0 }}</div><div class="stat-sub">需要重点关注</div></div>
+                        <div class="stat-card orange"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('emotion',20)"></div><div class="stat-label">中风险学生</div><div class="stat-value">{{ wp.student_summary.medium_risk||0 }}</div><div class="stat-sub">需要持续观察</div></div>
+                        <div class="stat-card green"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('check',20)"></div><div class="stat-label">待办事项</div><div class="stat-value">{{ wp.todo_count||0 }}</div><div class="stat-sub">今日需处理</div></div>
+                    </div>
+                    <!-- 日历 + 快速待办 -->
+                    <div class="main-sidebar mb-4">
+                        <div class="card m-0">
+                            <div class="card-header"><span class="card-title">📅 本月日历</span>
+                                <div class="flex items-center gap-3"><button class="btn btn-ghost btn-xs" @click="wpCalPrev">◀</button><span class="text-sm font-semibold">{{ wpCalYear }}年{{ wpCalMonth }}月</span><button class="btn btn-ghost btn-xs" @click="wpCalNext">▶</button></div></div>
+                            <table class="table" style="table-layout:fixed">
+                                <thead><tr><th style="padding:6px;text-align:center" v-for="d in ['日','一','二','三','四','五','六']">{{d}}</th></tr></thead>
+                                <tbody><tr v-for="(row,ri) in wpCalRows"><td v-for="(cell,ci) in row" :key="ci" class="cal-day" :class="{today:cell&&cell.isToday,empty:!cell}" @click="cell&&wpSelectDay(cell.day)" style="padding:2px;text-align:center;vertical-align:top">
+                                    <div v-if="cell"><div :style="{fontWeight:cell.isToday?'700':'400',color:cell.isToday?'var(--brand-600)':'var(--text-primary)',fontSize:'11px',minHeight:'18px'}">{{ cell.day }}</div>
+                                    <div v-for="(ev,ei) in cell.events.slice(0,2)" :key="ei" :style="{fontSize:'9px',padding:'1px 3px',borderRadius:'2px',margin:'1px 0',color:'white',background:ev.type==='high_risk'?'var(--danger)':ev.priority==='high'?'var(--danger)':ev.priority==='medium'?'var(--warning)':'var(--success)',overflow:'hidden',whiteSpace:'nowrap'}" :title="ev.title">{{ ev.title.length>6?ev.title.substring(0,6)+'…':ev.title }}</div>
+                                    <div v-if="cell.events.length>2" class="text-xs text-muted">+{{ cell.events.length-2 }}</div></div></td></tr></tbody>
+                            </table>
+                        </div>
+                        <div class="card m-0 bg-brand-50" style="border-color:var(--brand-200)">
+                            <div class="card-header border-none"><span class="card-title">⚡ 快速添加待办</span></div>
+                            <div class="form-group"><input class="input bg-white" v-model="newTodo.title" placeholder="待办标题..." @keyup.enter="addCustomTodo()"></div>
+                            <div class="flex gap-2 mb-4"><select class="input bg-white flex-1" v-model="newTodo.category"><option value="student_care">👤 学生关注</option><option value="work_task">📋 工作事项</option><option value="other">📌 其他</option></select><select class="input bg-white flex-1" v-model="newTodo.priority"><option value="high">🔴 高优先</option><option value="medium" selected>🟡 中优先</option><option value="low">🟢 低优先</option></select></div>
+                            <div class="form-group"><input class="input bg-white" v-model="newTodo.due_date" type="date"></div>
+                            <button class="btn btn-primary btn-sm w-full" @click="addCustomTodo()">添加待办</button>
+                        </div>
+                    </div>
+                    <!-- 分类待办 -->
+                    <div class="two-col">
+                        <div class="card m-0"><div class="card-header"><span class="card-title">👤 学生关注</span><span class="text-xs text-muted">{{ wpTodoStudent.length }} 项</span></div>
+                            <div v-if="wpTodoStudent.length" class="overflow-y-auto" style="max-height:320px">
+                                <div v-for="t in wpTodoStudent" :key="t.id" class="flex items-start gap-3 p-3 rounded-md mb-2" :class="{'bg-danger-bg border-l-danger':t.priority==='high','bg-warning-bg border-l-warning':t.priority==='medium','bg-success-bg border-l-success':t.priority==='low'}" style="border-left:3px solid">
+                                    <div class="flex-1"><div class="text-sm font-semibold">{{ t.title }}</div><div class="text-xs text-muted mt-1">{{ t.student_name||'' }}{{ t.student_id?' #'+t.student_id:'' }} · {{ t.due_date }}</div></div>
+                                    <button @click="t.source==='todo'?completeCustomTodo(t.id):wpCompleteTodo(parseInt(t.id.replace('rem_','')))" class="btn btn-success btn-xs">✓</button></div></div><div v-else class="empty-state p-6">✨ 暂无学生关注事项</div></div>
+                        <div class="card m-0"><div class="card-header"><span class="card-title">📋 工作事项</span><span class="text-xs text-muted">{{ wpTodoWork.length }} 项</span></div>
+                            <div v-if="wpTodoWork.length" class="overflow-y-auto" style="max-height:320px">
+                                <div v-for="t in wpTodoWork" :key="t.id" class="flex items-start gap-3 p-3 rounded-md mb-2" :class="{'bg-danger-bg border-l-danger':t.priority==='high','bg-warning-bg border-l-warning':t.priority==='medium','bg-success-bg border-l-success':t.priority==='low'}" style="border-left:3px solid">
+                                    <div class="flex-1"><div class="text-sm font-semibold">{{ t.title }}</div><div class="text-xs text-muted mt-1">{{ t.description||'' }} · {{ t.due_date }}</div></div>
+                                    <button @click="t.source==='todo'?completeCustomTodo(t.id):wpCompleteTodo(parseInt(t.id.replace('rem_','')))" class="btn btn-success btn-xs">✓</button></div></div><div v-else class="empty-state p-6">✨ 暂无工作事项</div></div>
+                    </div>
+                    <!-- 弹窗 -->
+                    <div v-if="calDayDetail.show" class="dialog-mask" @click.self="calDayDetail.show=false"><div class="dialog-box" style="max-width:500px"><div class="flex justify-between items-center mb-4"><h3 class="m-0">{{ calDayDetail.date }}</h3><button @click="calDayDetail.show=false" class="btn btn-ghost btn-sm">关闭</button></div><div v-if="calDayDetail.items.length"><div v-for="t in calDayDetail.items" :key="t.id" class="p-3 rounded-md mb-2" :class="t.priority==='high'?'bg-danger-bg border-l-danger':'bg-warning-bg border-l-warning'" style="border-left:3px solid"><div class="text-sm font-semibold">{{t.title}}</div><div class="text-xs text-muted">{{t.due_date}} {{t.student_name}}</div></div></div><div v-else class="empty-state">暂无待办</div></div></div>
+                </div>
+
+                <!-- ══════ 情绪网络图 ══════ -->
+                <div v-if="page==='emotionNetwork'" class="fade-in">
+                    <div class="page-header">
+                        <div><h3>情绪网络图</h3><p class="text-muted text-sm mt-1">{{ networkGraph.root ? networkGraph.root.name + ' · 学生情绪全景 · ' + networkGraph.root.total + ' 名学生' : '加载中...' }}<span v-if="networkGraph.updated_at" class="text-muted"> · 更新于 {{ networkGraph.updated_at }}</span></p></div>
+                        <div class="flex gap-2 items-center">
+                            <div class="network-legend">
+                                <span class="network-legend-item"><i style="background:#ef4444"></i>高风险</span>
+                                <span class="network-legend-item"><i style="background:#f59e0b"></i>中风险</span>
+                                <span class="network-legend-item"><i style="background:#10b981"></i>低风险</span>
+                            </div>
+                            <button class="btn btn-outline btn-sm" @click="loadEmotionNetwork()">🔄 刷新</button>
+                        </div>
+                    </div>
+                    <div class="card m-0" style="padding:0">
+                        <div class="network-filter-bar">
+                            <span class="text-sm text-muted font-semibold">严重程度：</span>
+                            <button class="network-filter-chip" :class="{active:networkFilter.includes('high')}" @click="toggleNetworkFilter('high')">🔴 高风险 <b>{{ networkGraph.stats ? networkGraph.stats.high : 0 }}</b></button>
+                            <button class="network-filter-chip" :class="{active:networkFilter.includes('medium')}" @click="toggleNetworkFilter('medium')">🟠 中风险 <b>{{ networkGraph.stats ? networkGraph.stats.medium : 0 }}</b></button>
+                            <button class="network-filter-chip" :class="{active:networkFilter.includes('low')}" @click="toggleNetworkFilter('low')">🟢 低风险 <b>{{ networkGraph.stats ? networkGraph.stats.low : 0 }}</b></button>
+                            <span class="ml-auto text-xs text-muted">🖱 拖拽节点 · 点击学生跳转对话 · 视频通话后自动更新</span>
+                        </div>
+                        <div class="network-canvas-wrap" style="position:relative">
+                            <canvas ref="networkCanvas" style="width:100%;height:100%"></canvas>
+                            <div v-if="!networkGraph.groups || !networkGraph.groups.length" class="network-empty">暂无学生数据</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ══════ 师生对话 ══════ -->
+                <div v-if="page==='teacherChat'" class="fade-in">
+                    <div class="card card-flush">
+                        <div class="chat-layout" style="height:calc(100vh - 150px)">
+                            <!-- 左侧联系人 -->
+                            <div class="chat-sidebar">
+                                <div class="p-4 font-bold text-base border-b">💬 师生对话</div>
+                                <div class="p-3 border-b">
+                                    <input class="input input-sm" v-model="studentSearchQuery" @input="searchStudentsHandler" placeholder="搜索学生姓名..." style="padding:6px 8px;font-size:12px">
+                                    <div v-if="studentSearchResults.length" class="bg-tertiary rounded-md p-1 mt-2 overflow-y-auto" style="max-height:150px">
+                                        <div v-for="s in studentSearchResults.slice(0,5)" :key="s.id" @click="inviteStudent(s)" class="flex items-center gap-2 p-2 cursor-pointer rounded-sm text-sm hover-bg">
+                                            <div class="avatar avatar-sm">{{ s.name[0] }}</div>
+                                            <div class="flex-1 min-w-0"><div class="font-semibold">{{ s.name }}</div><div class="text-xs text-muted">{{ s.class_name }} · {{ s.student_id }}</div></div>
+                                            <span class="text-brand" style="font-size:18px">+</span></div></div>
+                                </div>
+                                <div class="flex-1 overflow-y-auto">
+                                    <div class="text-xs text-muted uppercase p-2 px-4 font-semibold">最近消息</div>
+                                    <div v-for="contact in messageContacts" :key="contact.id" @click="selectTeacherContact(contact)" class="flex items-center gap-3 p-3 cursor-pointer border-b border-light hover-bg" :class="{'bg-brand-50':teacherSelected&&teacherSelected.id===contact.id}">
+                                        <div class="avatar">{{ contact.name[0] }}</div>
+                                        <div class="flex-1 min-w-0"><div class="flex justify-between items-center"><span class="font-semibold text-sm">{{ contact.name }}<span v-if="contact.student_id" class="text-xs text-muted font-normal"> #{{ contact.student_id }}</span></span><span v-if="contact.unread_count" class="badge badge-danger badge-sm">{{ contact.unread_count }}</span></div><div v-if="contact.last_message" class="text-xs text-muted mt-1 truncate">{{ contact.last_message.content }}</div></div></div>
+                                    <div v-if="!messageContacts.length" class="empty-state p-6 text-xs">搜索学生姓名发起对话</div></div>
+                            </div>
+                            <!-- 右侧聊天 -->
+                            <div class="chat-main">
+                                <div v-if="teacherSelected" class="flex items-center justify-between p-3 px-4 border-b">
+                                    <div class="flex items-center gap-3"><div class="avatar">{{ teacherSelected.name[0] }}</div><span class="font-bold text-base">{{ teacherSelected.name }}<span v-if="teacherSelected.student_id" class="text-sm text-muted font-normal"> #{{ teacherSelected.student_id }}</span></span></div>
+                                    <div class="flex gap-2 items-center">
+                                        <button @click="analyzeCounselorGuidance()" :disabled="guidanceLoading" class="btn btn-sm" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:white">{{ guidanceLoading?'分析中...':'🧠 AI辅导分析' }}</button>
+                                        <button @click="openTeacherVideo" v-if="!teacherInCall" class="btn btn-outline btn-sm">📹 视频</button>
+                                        <button v-else @click="endTeacherVideo" class="btn btn-danger btn-xs">挂断</button>
+                                    </div>
+                                </div>
+                                <!-- 视频+实时情绪 -->
+                                <div v-if="teacherInCall" class="video-grid teacher-video-grid">
+                                    <div class="video-panel-item teacher-remote-panel bg-dark rounded-sm"><video ref="teacherRemoteVideo" autoplay playsinline></video><canvas ref="yoloCanvas" class="absolute inset-0" style="pointer-events:none" v-if="yoloActive"></canvas><div class="video-label">&#23398;&#29983;&#30011;&#38754;&#65288;&#20840;&#36523;&#20837;&#38236;&#65289;</div></div>
+                                    <div class="video-panel-item teacher-local-panel"><video ref="teacherLocalVideo" autoplay muted playsinline></video><div class="video-label">&#25105;&#30340;&#30011;&#38754;</div></div>
+                                    <div class="emotion-panel teacher-emotion-panel">
+                                        <div class="flex items-center gap-2 pb-3 mb-2 text-sm font-bold" style="border-bottom:1px solid rgba(255,255,255,0.1)"><span class="emotion-live-indicator" :class="yoloActive?'active':'idle'"></span>🧠 实时情绪感知</div>
+                                        <div v-if="yoloActive" class="text-center mb-2">
+                                            <div style="font-size:48px;margin-bottom:2px">{{ yoloEmotionDisplay.icon }}</div>
+                                            <div class="text-xl font-bold" style="color:var(--brand-400)">{{ yoloEmotionDisplay.text }}</div>
+                                            <div v-if="yoloEmotionDisplay.confidence!=='--'" class="text-xs opacity-70">置信度 {{ yoloEmotionDisplay.confidence }}%</div>
+                                            <button @click="toggleYolo" class="btn btn-xs mt-2" :class="yoloActive?'btn-danger':'btn-success'">{{ yoloActive?'⏹ 停止':'▶ 开启' }}</button></div>
+                                        <div v-else class="text-center p-4 opacity-60"><div style="font-size:32px;margin-bottom:4px">🎥</div><div>点击开启实时情绪识别</div><button @click="toggleYolo" class="btn btn-success btn-xs mt-2">▶ 开启监测</button></div>
+<div v-if="yoloEmotionShow" class="mb-2"><div class="flex justify-between text-xs opacity-60"><span>????</span><span>{{ yoloEmotionDisplay.intensity }}/10</span></div><div class="emotion-intensity-bar"><div class="fill" :style="{width:yoloEmotionDisplay.intensity*10+'%',background:yoloEmotionDisplay.color}"></div></div><div class="flex justify-between text-xs opacity-60 mt-1"><span>&#21160;&#20316;&#21305;&#37197;&#32622;&#20449;&#24230;</span><span>{{ yoloEmotionDisplay.actionConfidence||0 }}%</span></div></div>
+                                        <div class="emotion-details" v-if="yoloActive">
+                                            <div class="emotion-detail-item"><span class="label">&#128528; &#30385;&#30473;</span><span class="value" :style="{color:yoloEmotionDisplay.faceTension}">{{ yoloEmotionDisplay.browFurrow||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#128532; &#22068;&#35282;&#19979;&#22402;</span><span class="value" :style="{color:yoloEmotionDisplay.mouthDown}">{{ yoloEmotionDisplay.mouthCornerDrop||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#128563; &#30524;&#30555;&#30634;&#22823;</span><span class="value" :style="{color:yoloEmotionDisplay.eyeOpenColor}">{{ yoloEmotionDisplay.eyeOpen||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#128064; &#35270;&#32447;</span><span class="value" :style="{color:yoloEmotionDisplay.gazeAvert}">{{ yoloEmotionDisplay.gazeAversion||0 }}% {{ yoloEmotionDisplay.gazeLabel }}</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#128483; &#35821;&#36895;</span><span class="value" :style="{color:yoloEmotionDisplay.speechRate>45?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.speechRate||0 }}% {{ yoloEmotionDisplay.speechRateLabel }}</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#9208; &#20572;&#39039;</span><span class="value" :style="{color:yoloEmotionDisplay.pauseRatio>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.pauseRatio||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#128147; &#20302;&#22836;</span><span class="value" :style="{color:yoloEmotionDisplay.posture}">{{ yoloEmotionDisplay.headDownPercent||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#129485; 前倾</span><span class="value" :style="{color:yoloEmotionDisplay.forwardHead>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.forwardHead||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#128208; 肩线</span><span class="value" :style="{color:yoloEmotionDisplay.shoulderSlope>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.shoulderSlope||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#129489;&#8205;&#128187; &#22352;&#23039;</span><span class="value" :style="{color:yoloEmotionDisplay.postureStiffnessColor}">{{ yoloEmotionDisplay.postureStiffness||0 }}% {{ yoloEmotionDisplay.postureStiffnessLabel }}</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#129485; &#24367;&#33136;/&#39548;&#32972;</span><span class="value" :style="{color:yoloEmotionDisplay.slouch>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.slouch||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#128064; &#30524;&#31070;&#28418;&#31227;</span><span class="value" :style="{color:yoloEmotionDisplay.gazeInstability>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.gazeInstability||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#129325; &#25720;&#40763;&#23376;</span><span class="value" :style="{color:yoloEmotionDisplay.touchNose>30?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.touchNose||0 }}%</span></div>
+                                            <div class="emotion-detail-item"><span class="label">&#129504; &#25376;&#22836;</span><span class="value" :style="{color:yoloEmotionDisplay.scratchHead>30?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.scratchHead||0 }}%</span></div></div>
+                                        <div v-if="yoloActive" class="text-xs opacity-60 mt-2">检测源：{{ yoloEmotionDisplay.poseDetected?'面部关键点 + 姿态估计':'面部关键点' }}</div>
+                                        <div v-if="yoloActive" class="mt-1 text-xs opacity-70">&#35270;&#35273;&#29366;&#24577;&#65306;{{ visionDiag.modelReady?'&#27169;&#22411;&#24050;&#21152;&#36733;':'&#27169;&#22411;&#21152;&#36733;&#20013;/&#22833;&#36133;' }} &middot; {{ visionDiag.faceDetected?'&#24050;&#35782;&#21035;&#21040;&#38754;&#37096;':'&#26410;&#35782;&#21035;&#21040;&#38754;&#37096;' }} &middot; {{ visionDiag.poseDetected?'&#24050;&#35782;&#21035;&#21040;&#23039;&#24577;':'&#26410;&#35782;&#21035;&#21040;&#23039;&#24577;' }} &middot; {{ visionDiag.status }} / {{ visionDiag.lastUpdate }}</div>
+                                        <div v-if="yoloActive&&visionDiag.lastError" class="mt-1 text-xs" style="color:#f59e0b">&#35270;&#35273;&#35786;&#26029;&#65306;{{ visionDiag.lastError }}</div>
+                                        <div v-if="yoloActive" class="mt-1 text-xs opacity-70">&#21047;&#26032;&#24103;&#65306;{{ visionDiag.frameCount||0 }} &middot; &#23039;&#24577;&#24103;&#65306;{{ visionDiag.poseFrameCount||0 }} &middot; FaceMesh&#24103;&#65306;{{ visionDiag.faceMeshFrameCount||0 }} &middot; &#35270;&#39057;&#65306;{{ visionDiag.videoSize||'--' }} &middot; &#32454;&#38754;&#37096;&#65306;{{ visionDiag.faceMeshDetected?'&#24050;&#35782;&#21035;':'&#26410;&#35782;&#21035;' }} &middot; FaceMesh&#35009;&#20999;&#65306;{{ visionDiag.faceMeshCropUsed?'&#24050;&#21551;&#29992;':'&#26410;&#21551;&#29992;' }} &middot; &#38754;&#37096;&#35009;&#20999;&#65306;{{ visionDiag.faceCropUsed?'&#24050;&#21551;&#29992;':'&#26410;&#21551;&#29992;' }} &middot; &#25351;&#26631;&#21464;&#21270;&#65306;{{ visionDiag.changedAt||'--' }} &middot; &#26410;&#26816;&#20986;&#38754;&#37096;&#65306;{{ visionDiag.noFaceCount||0 }} &#27425;</div>
+                                        <div v-if="yoloActive&&visionDiag.rawMicro" class="mt-1 text-xs opacity-60">&#21407;&#22987;&#25351;&#26631;&#65306;&#30385;&#30473; {{ visionDiag.rawMicro.browFurrow||0 }} / &#35270;&#32447; {{ visionDiag.rawMicro.gazeAversion||0 }} / &#30524;&#31070;&#28418;&#31227; {{ visionDiag.rawMicro.gazeInstability||0 }} / &#20302;&#22836; {{ visionDiag.rawMicro.headDown||0 }} / &#24367;&#33136; {{ visionDiag.rawMicro.slouch||0 }} / &#21069;&#20542; {{ visionDiag.rawMicro.forwardHead||0 }} / &#32937;&#32447; {{ visionDiag.rawMicro.shoulderSlope||0 }} / &#25720;&#40763; {{ visionDiag.rawMicro.touchNose||0 }} / &#25376;&#22836; {{ visionDiag.rawMicro.scratchHead||0 }}</div>
+                                        <div v-if="yoloActive" class="audio-diagnostic-card mt-2 p-2 rounded-md text-xs">
+                                            <div class="flex justify-between"><span>&#127911; &#22768;&#38899;&#20114;&#20256;</span><strong :style="{color:audioDiag.remoteAudio&&audioDiag.remoteEnabled?'#10b981':'#ef4444'}">{{ audioDiag.remoteAudio&&audioDiag.remoteEnabled?'&#24050;&#25910;&#21040;&#23398;&#29983;&#38899;&#36712;':'&#26410;&#25910;&#21040;&#23398;&#29983;&#38899;&#36712;' }}</strong></div>
+                                            <div class="mt-1 opacity-75">&#26412;&#22320;&#40614;&#20811;&#39118;&#65306;{{ audioDiag.localMic&&audioDiag.localEnabled?'&#24050;&#24320;&#21551;':'&#26410;&#24320;&#21551;' }} &middot; &#36828;&#31471;&#38899;&#36712;&#65306;{{ audioDiag.remoteTrackCount }} &#36335; / {{ audioDiag.remoteReady }}</div>
+                                            <div class="mt-1 opacity-75">&#23454;&#26102;&#38899;&#37327;&#65306;{{ audioDiag.volume }}% &middot; {{ audioDiag.speaking?'&#35828;&#35805;&#20013;':'&#38745;&#38899;/&#20572;&#39039;' }} &middot; &#22522;&#39057;&#65306;{{ audioDiag.pitch||0 }}Hz</div>
+                                            <div class="mt-1 opacity-75">&#20998;&#26512;&#22120;&#65306;{{ audioDiag.analyzer?'&#36816;&#34892;&#20013;':'&#26410;&#21551;&#21160;' }} &middot; AudioContext&#65306;{{ audioDiag.contextState }} &middot; &#26356;&#26032;&#65306;{{ audioDiag.updatedAt }}</div>
+                                            <div v-if="audioDiag.playBlocked" class="mt-1" style="color:#f59e0b">&#27983;&#35272;&#22120;&#25318;&#25130;&#20102;&#36828;&#31471;&#22768;&#38899;&#33258;&#21160;&#25773;&#25918;&#65292;&#35831;&#28857;&#20987;&#35270;&#39057;&#21306;&#22495;&#25110;&#37325;&#26032;&#25509;&#21548;&#21518;&#20877;&#27979;&#35797;&#12290;</div>
+                                        </div>
+                                        <div v-if="yoloAlerts.length" class="emotion-alert-list"><div class="text-xs opacity-60 mb-1">检测记录</div>
+                                            <div v-for="(a,i) in yoloAlerts.slice(0,10)" :key="i" class="emotion-alert-item"><span>{{ EmotionFusionEngine?EmotionFusionEngine.emotionIcon(a.emotion):'🤔' }}</span><span class="flex-1">{{ a.emotion }}</span><span>Lv{{ a.severity }}</span></div></div>
+                                    </div>
+                                </div>
+                                <!-- 来电 -->
+                                <div v-if="incomingCall" class="flex items-center justify-between p-3 bg-brand-50 border-b" style="border-bottom:2px solid var(--brand-500)"><span>📞 {{ incomingCall.student_name }} 正在呼叫...</span><div class="flex gap-2"><button @click="acceptVideoCall" class="btn btn-success btn-xs">接听</button><button @click="rejectVideoCall" class="btn btn-danger btn-xs">拒绝</button></div></div>
+                                <!-- AI分析结果 -->
+                                <div v-if="realtimeCallSummary" class="dialog-mask" @click.self="realtimeCallSummary=null"><div class="dialog-box" style="max-width:560px">
+                                    <div class="flex justify-between items-center mb-4"><h3 class="m-0">&#128202; &#26412;&#27425;&#35270;&#39057;&#24773;&#32490;&#24635;&#32467;</h3><button @click="realtimeCallSummary=null" class="btn btn-ghost btn-sm">&#20851;&#38381;</button></div>
+                                    <div class="grid gap-2 text-sm">
+                                        <div><strong>&#23398;&#29983;&#65306;</strong>{{ realtimeCallSummary.student_name }} <span class="text-muted">{{ realtimeCallSummary.student_id||'' }}</span></div>
+                                        <div><strong>&#20027;&#23548;&#24773;&#32490;&#65306;</strong>{{ realtimeCallSummary.dominant_emotion }}&#65307;<strong>&#23792;&#20540;&#24773;&#32490;&#65306;</strong>{{ realtimeCallSummary.peak_emotion }} {{ realtimeCallSummary.peak_intensity }}/10</div>
+                                        <div><strong>&#39118;&#38505;&#31561;&#32423;&#65306;</strong><span :class="realtimeCallSummary.risk_level==='high'?'text-danger':realtimeCallSummary.risk_level==='medium'?'text-warning':'text-success'">{{ realtimeCallSummary.risk_label }}</span></div>
+                                        <div><strong>&#22797;&#26597;&#32508;&#21512;&#20998;&#65306;</strong>{{ realtimeCallSummary.review_score||realtimeCallSummary.peak_intensity }}/10 <span class="text-muted">&#65288;&#24773;&#32490;&#24378;&#24230;+&#30385;&#30473;+&#30524;&#31070;+&#24367;&#33136;/&#39548;&#32972;+&#25720;&#40763;+&#25376;&#22836;+&#35821;&#38899;&#20572;&#39039;&#32508;&#21512;&#35745;&#31639;&#65289;</span></div>
+                                        <div><strong>&#20851;&#38190;&#24494;&#21160;&#20316;&#65306;</strong>{{ realtimeCallSummary.key_signals||'-' }}</div>
+                                        <div><strong>&#22797;&#26597;&#24314;&#35758;&#65306;</strong>{{ realtimeCallSummary.follow_up_days }}&#26085;&#21518;&#65288;{{ realtimeCallSummary.follow_up_date }}&#65289;{{ realtimeCallSummary.follow_up_action }}</div>
+                                        <div class="p-3 rounded-md" style="background:var(--bg-tertiary);line-height:1.7">{{ realtimeCallSummary.summary }}</div>
+                                        <div class="text-xs text-muted">&#22797;&#26597;&#35268;&#21017;&#65306;{{ realtimeCallSummary.review_rule_text }}</div>
+                                    </div>
+                                </div></div>
+                                <div v-if="guidanceResult" class="mx-4 my-2 p-4 bg-brand-50 rounded-lg border border-brand-200 text-sm" style="max-height:56vh;overflow-y:auto">
+                                    <div class="flex justify-between items-center mb-3"><strong class="text-brand text-sm">🧠 AI辅导分析 <span class="text-muted text-xs font-normal">点击话术直接填入输入框</span></strong><button @click="guidanceResult=null" class="btn btn-ghost btn-xs" style="font-size:16px">✕</button></div>
+                                    <div class="mb-2"><span class="text-secondary">📊 情绪评估：</span>{{ guidanceResult.emotion_assessment }}</div>
+                                    <div class="mb-3"><span class="text-secondary">⚠️ 风险提示：</span><span class="guidance-risk-tag" :style="guidanceRiskTagStyle">{{ guidanceResult.risk_alert || '无风险' }}</span></div>
+                                    <div class="guidance-category" v-for="(cat,ci) in (guidanceResult.categories||[])" :key="ci" :style="{'--gc':cat.color||'#6366f1'}">
+                                        <div class="guidance-cat-head">
+                                            <span class="guidance-cat-icon">{{ cat.icon||'💬' }}</span>
+                                            <span class="guidance-cat-name">{{ cat.type }}</span>
+                                            <span class="guidance-cat-desc">{{ cat.description||'' }}</span>
+                                        </div>
+                                        <div class="guidance-script" v-for="(s,si) in cat.scripts" :key="si">
+                                            <span class="guidance-script-text">{{ s }}</span>
+                                            <button class="guidance-fill-btn" @click="fillTeacherMsg(s)">填入</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 消息区 -->
+                                <div v-if="teacherSelected" class="flex-1 overflow-y-auto p-4 bg-tertiary" ref="teacherMsgRef">
+                                    <div v-for="msg in teacherChatMsgs" :key="msg.id" class="flex mb-3" :class="msg.sender_type==='counselor'?'justify-end':'justify-start'">
+                                        <div class="bubble" :class="msg.sender_type==='counselor'?'bubble-sent':'bubble-received'">{{ msg.content }}<div class="bubble-time">{{ Helpers.formatTime(msg.created_at) }}</div></div></div></div>
+                                <div v-else class="flex-1 flex items-center justify-center text-muted">👈 选择学生开始对话</div>
+                                <!-- 输入区 -->
+                                <div v-if="teacherSelected" class="p-3 border-t bg-secondary">
+                                    <div v-if="teacherShowEmoji" class="grid mb-2" style="grid-template-columns:repeat(10,1fr);gap:4px;max-height:200px;overflow-y:auto;background:var(--bg-tertiary);border-radius:var(--radius-md);padding:var(--space-2)"><span v-for="e in emojiList" :key="e" @click="insertTeacherEmoji(e)" style="font-size:20px;cursor:pointer;padding:4px;text-align:center;border-radius:4px">{{ e }}</span></div>
+                                    <div class="chat-compose-row"><button @click="teacherShowEmoji=!teacherShowEmoji" class="btn btn-ghost chat-emoji-btn">&#128522;</button><textarea class="input chat-compose-input" v-model="teacherNewMsg" @keydown.enter.exact.prevent="sendTeacherMsg" placeholder="&#36755;&#20837;&#28040;&#24687;..." rows="1" @input="autoResize"></textarea><button @click="sendTeacherMsg" :disabled="!teacherNewMsg.trim()" class="btn btn-primary chat-send-btn">&#21457;&#36865;</button></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ══════ 班会策划 ══════ -->
+                <div v-if="page==='classMeeting'" class="fade-in">
+                    <div class="card"><div class="card-header"><span class="card-title">📋 班会策划</span></div>
+                        <p class="text-secondary mb-4">输入班会主题，AI 自动生成完整的策划方案</p>
+                        <div class="form-group"><label>班会主题</label><input class="input" v-model="meetingTheme" placeholder="如：期末考试诚信教育、心理健康主题班会..."></div>
+                        <button @click="generateMeeting" :disabled="!meetingTheme.trim()||meetingLoading" class="btn btn-primary">{{ meetingLoading?'生成中...':'✨ 生成策划方案' }}</button>
+                        <div v-if="meetingResult" class="mt-5 p-5 bg-tertiary rounded-lg leading-relaxed text-sm" v-html="Helpers.renderMd(meetingResult)"></div></div>
+                </div>
+
+                <!-- ══════ 公文写作 ══════ -->
+                <div v-if="page==='docWriting'" class="fade-in">
+                    <div class="card"><div class="card-header"><span class="card-title">📄 公文写作</span></div>
+                        <p class="text-secondary mb-4">选择文种并输入内容要点，AI 自动生成规范公文</p>
+                        <div class="form-group"><label>公文文种</label><select class="input" v-model="docType"><option value="通知">通知</option><option value="通报">通报</option><option value="报告">报告</option><option value="请示">请示</option><option value="批复">批复</option><option value="函">函</option><option value="纪要">纪要</option></select></div>
+                        <div class="form-group"><label>内容要点</label><textarea class="input" v-model="docContent" rows="4" placeholder="请输入公文的主要内容要点..."></textarea></div>
+                        <button @click="generateDoc" :disabled="!docContent.trim()||docLoading" class="btn btn-primary">{{ docLoading?'生成中...':'✨ 生成公文' }}</button>
+                        <div v-if="docResult" class="mt-5 p-5 bg-tertiary rounded-lg leading-relaxed text-sm" v-html="Helpers.renderMd(docResult)"></div></div>
+                </div>
+
+                <!-- ══════ 风险预警 ══════ -->
+                <div v-if="page==='alerts'" class="fade-in">
+                    <div class="card"><div class="card-header"><span class="card-title">🚨 风险预警中心</span></div>
+                        <div class="table-container" v-if="alerts.length">
+                            <table class="table"><thead><tr><th>学生</th><th>班级</th><th>情绪</th><th>强度</th><th>等级</th><th>状态</th><th>操作</th></tr></thead><tbody>
+                                <tr v-for="a in alerts" :key="a.id"><td class="font-semibold">{{ a.student_name }}</td><td class="text-xs text-muted">{{ a.student_class }}</td><td>{{ a.emotion_type }}</td><td>{{ a.intensity }}/10</td><td><span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'muted'}[a.risk_level])">{{ Helpers.riskLbl(a.risk_level) }}</span></td><td><span :class="a.status==='pending'?'text-warning':a.status==='resolved'?'text-success':'text-muted'" class="text-xs font-semibold">{{ {pending:'待处理',acknowledged:'已确认',resolved:'已解决'}[a.status] }}</span></td><td><button v-if="a.status==='pending'" @click="ackAlert(a.id)" class="btn btn-sm" style="background:var(--brand-gradient);color:white">确认处理</button><span v-else class="text-xs text-success">✓</span></td></tr></tbody></table>
+                        </div><div v-else class="empty-state">✨ 暂无预警记录</div></div>
+                </div>
+
+                <!-- ══════ 学生管理 ══════ -->
+                <div v-if="page==='students'" class="fade-in">
+                    <div class="card"><div class="flex justify-between items-center mb-4 flex-wrap gap-3"><span class="card-title m-0">👥 学生管理</span>
+                        <div class="flex gap-3 items-center"><input class="input input-sm" v-model="studentSearch" @input="searchStudentsHandler" placeholder="搜索学号/姓名..." style="width:200px"><button @click="showAddStudent=true" class="btn btn-primary btn-sm">+ 添加学生</button></div></div>
+                        <div class="table-container">
+                            <table class="table"><thead><tr><th>学号</th><th>姓名</th><th>性别</th><th>班级</th><th>情绪状态</th><th>风险等级</th><th>操作</th></tr></thead><tbody>
+                                <tr v-for="s in students" :key="s.student_id"><td>{{s.student_id}}</td><td class="font-semibold">{{s.name}}</td><td class="text-xs text-muted">{{s.gender}}</td><td class="text-xs text-muted">{{s.class_name||'-'}}</td><td><span class="font-medium" :style="{color:Helpers.emoColor(s.emotion_status)}">{{s.emotion_status||'未知'}}</span></td><td><span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'muted'}[s.risk_level])">{{Helpers.riskLbl(s.risk_level)}}</span></td><td><button class="btn btn-sm" style="background:var(--brand-gradient);color:white" @click="viewStudent(s.student_id)">详情</button></td></tr>
+                                <tr v-if="!students.length"><td colspan="7" class="text-center text-muted p-8">暂无学生数据，点击「添加学生」开始</td></tr></tbody></table>
+                        </div>
+                        <!-- 分页 -->
+                        <div class="flex justify-center gap-2 mt-4" v-if="students.length>20">
+                            <button class="btn btn-outline btn-xs" disabled>上一页</button><span class="text-xs text-muted self-center px-2">共 {{ students.length }} 条</span><button class="btn btn-outline btn-xs" disabled>下一页</button></div>
+                    </div>
+                    <!-- 学生详情弹窗 -->
+                    <div v-if="selectedStudent" class="dialog-mask" @click.self="selectedStudent=null"><div class="dialog-box" style="max-width:560px">
+                        <div class="flex items-center gap-4 mb-4"><div class="avatar avatar-lg">{{(selectedStudent.name||'?')[0]}}</div><div><h3 class="m-0">{{selectedStudent.name}} <span class="text-sm text-muted font-normal">{{selectedStudent.student_id}}</span></h3><div class="text-sm text-secondary">{{selectedStudent.class_name||''}} | {{selectedStudent.college||''}}</div></div></div>
+                        <div class="text-sm text-secondary leading-loose"><div><strong>性别：</strong>{{selectedStudent.gender||'未设置'}}</div><div><strong>手机：</strong>{{selectedStudent.phone||'未设置'}}</div><div><strong>情绪状态：</strong><span :style="{color:Helpers.emoColor(selectedStudent.emotion_status)}">{{selectedStudent.emotion_status||'未知'}}</span></div><div><strong>风险等级：</strong><span class="badge" :class="'badge-'+(selectedStudent.risk_level==='high'?'danger':selectedStudent.risk_level==='medium'?'warning':'success')">{{Helpers.riskLbl(selectedStudent.risk_level)}}</span></div><div class="mt-2"><strong>备注：</strong></div><textarea class="input mt-1" v-model="selectedStudent.notes" @blur="updateStudentNotes(selectedStudent.student_id,selectedStudent.notes)" placeholder="添加备注..."></textarea></div>
+                        <div v-if="studentProfiles.length" class="mt-4"><h4 class="mb-3">辅导记录</h4><div v-for="(p,i) in studentProfiles" :key="i" class="p-3 bg-tertiary rounded-md mb-2 text-sm"><div class="text-muted mb-1 text-xs">{{p.created_at||''}}</div><div v-html="Helpers.renderMd(p.content||p.summary||'')"></div></div></div>
+                        <div class="dialog-btns"><button class="btn btn-ghost" @click="selectedStudent=null">关闭</button></div></div></div>
+                    <!-- 添加学生弹窗 -->
+                    <div v-if="showAddStudent" class="dialog-mask" @click.self="showAddStudent=false"><div class="dialog-box"><h3>添加学生</h3>
+                        <label>学号</label><input class="input" v-model="newStudent.student_id" placeholder="请输入学号">
+                        <label>姓名</label><input class="input" v-model="newStudent.name" placeholder="请输入姓名">
+                        <label>性别</label><select class="input" v-model="newStudent.gender"><option value="">请选择</option><option value="男">男</option><option value="女">女</option></select>
+                        <label>学院</label><input class="input" v-model="newStudent.college" placeholder="请输入学院">
+                        <label>班级</label><input class="input" v-model="newStudent.class_name" placeholder="请输入班级">
+                        <label>手机</label><input class="input" v-model="newStudent.phone" placeholder="请输入手机号">
+                        <label>备注</label><textarea class="input" v-model="newStudent.notes" placeholder="备注信息..."></textarea>
+                        <div class="dialog-btns"><button class="btn btn-ghost" @click="showAddStudent=false">取消</button><button class="btn btn-primary" @click="addStudent()">确定添加</button></div></div></div>
+                </div>
+
+                <!-- ══════ 情绪看板 ══════ -->
+                <div v-if="page==='emotionBoard'" class="fade-in">
+                    <div class="page-header"><div><h3>情绪看板</h3><p class="text-muted text-sm mt-1">学生情绪健康全景监测</p></div><div class="flex gap-2"><button class="btn btn-success btn-sm" @click="seedRealtimeDemoData()">&#10024; 预置演示数据</button><button class="btn btn-outline btn-sm" @click="loadEmotionDashboard()">&#128260; 刷新数据</button></div></div>
+                    <div class="stats-row"><div class="stat-card blue"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('students',20)"></div><div class="stat-label">监测学生总数</div><div class="stat-value">{{ emoDashStats.total||0 }}</div></div>
+                        <div class="stat-card red"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('alert',20)"></div><div class="stat-label">高风险预警</div><div class="stat-value">{{ emoDashStats.highRisk||0 }}</div></div>
+                        <div class="stat-card orange"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('emotion',20)"></div><div class="stat-label">中风险关注</div><div class="stat-value">{{ emoDashStats.mediumRisk||0 }}</div></div>
+                        <div class="stat-card green"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('chart',20)"></div><div class="stat-label">平均情绪强度</div><div class="stat-value">{{ emoDashStats.avgIntensity||0 }}</div></div></div>
+                    <div class="three-col mb-4"><div class="card m-0"><div class="card-header"><span class="card-title">情绪分布</span></div><div ref="emoPieChart" style="height:260px"></div></div>
+                        <div class="card m-0"><div class="card-header"><span class="card-title">风险等级</span></div><div ref="emoRiskChart" style="height:260px"></div></div>
+                        <div class="card m-0"><div class="card-header"><span class="card-title">近7天趋势</span></div><div ref="emoTrendChart" style="height:260px"></div></div></div>
+                    <div class="two-col"><div class="card m-0"><div class="card-header"><span class="card-title">情绪日历热力图</span></div><div ref="emoHeatmapChart" style="height:200px"></div></div>
+                        <div class="card m-0"><div class="card-header"><span class="card-title">最近预警</span></div><div v-if="emoDashAlerts.length" class="overflow-y-auto" style="max-height:200px"><div v-for="a in emoDashAlerts.slice(0,6)" :key="a.id" class="alert-item text-xs" :class="a.risk_level"><span class="font-semibold">{{a.student_name}}</span><span class="text-muted">{{a.emotion_type}}·{{a.intensity}}/10</span><span class="badge ml-auto" :class="'badge-'+({high:'danger',medium:'warning'}[a.risk_level])">{{Helpers.riskLbl(a.risk_level)}}</span></div></div><div v-else class="empty-state p-5">&#10024; 暂无预警</div></div></div>
+                    <div class="card mt-4 realtime-log-card">
+                        <div class="card-header"><span class="card-title">实时视频情绪记录</span><span class="text-xs text-muted">老师端识别后自动同步，管理员用于留痕与复盘</span></div>
+                        <div v-if="realtimeEmotionLogs.length" class="table-wrap">
+                            <table class="realtime-log-table">
+                                <thead><tr><th>时间</th><th>学生</th><th>班级</th><th>情绪</th><th>强度</th><th>置信度</th><th>风险</th><th>来源</th></tr></thead>
+                                <tbody><tr v-for="log in realtimeEmotionLogs" :key="log.id"><td>{{ Helpers.formatTime(log.created_at) }}</td><td class="font-semibold">{{ log.student_name }}</td><td>{{ log.student_class || '-' }}</td><td>{{ log.emotion }}</td><td>{{ log.intensity || 0 }}/10</td><td>{{ Math.round((log.confidence || 0) * 100) }}%</td><td><span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'success'}[log.risk_level]||'secondary')">{{ Helpers.riskLbl(log.risk_level||'low') }}</span></td><td>{{ log.audio_path || '实时视频通话' }}</td></tr></tbody>
+                            </table>
+                        </div>
+                        <div v-else class="empty-state p-5">暂无实时分析记录，可点击“预置演示数据”载入展示样例</div>
+                    </div>
+                </div>
+
+                <!-- Reminders -->
+                <div v-if="page==='reminders'" class="fade-in">
+                    <div class="card"><div class="flex justify-between items-center mb-4"><span class="card-title m-0">🔔 提醒中心</span><div class="flex gap-3 items-center"><label class="text-sm text-secondary cursor-pointer flex items-center gap-1"><input type="checkbox" v-model="showCompleted" @change="loadReminders()"> 显示已完成</label><button @click="loadReminders()" class="btn btn-outline btn-xs">🔄 刷新</button></div></div>
+                        <div v-for="r in reminders.filter(function(r){return showCompleted||!r.completed})" :key="r.id" class="rem-card" :class="[r.priority,r.completed?'done':'']"><span class="rem-priority" :class="r.priority">{{r.priority==='high'?'高':r.priority==='medium'?'中':'低'}}</span><div class="rem-content"><div>{{r.content||r.title||'无内容'}}</div><div class="rem-time">{{r.created_at||''}} <span v-if="r.student_name">| {{r.student_name}}</span></div></div><button v-if="!r.completed" @click="completeReminder(r.id)" class="btn btn-success btn-xs">✓ 完成</button><span v-else class="text-success text-sm whitespace-nowrap">✓ 已完成</span></div>
+                        <div v-if="!reminders.length" class="empty-state">暂无提醒</div></div>
+                </div>
+
+                <!-- ══════ 知识库 ══════ -->
+                <div v-if="page==='knowledge'" class="fade-in">
+                    <div class="card"><div class="card-header"><span class="card-title">📚 知识库管理</span></div>
+                        <p class="text-muted text-sm mb-4">上传学校规章制度文档，AI 基于文档内容回答问题</p>
+                        <div class="flex gap-3 items-center"><button @click="$refs.docInput.click()" class="btn btn-success btn-sm">📄 上传文档</button><input type="file" accept=".pdf,.txt,.docx,.md" @change="uploadDoc" style="display:none" ref="docInput"><span v-if="kbStats" class="text-sm text-secondary">文档: <b>{{ kbStats.doc_count||0 }}</b> · 文本块: <b>{{ kbStats.chunk_count||0 }}</b></span></div></div>
+                </div>
+
+                <!-- ══════ 系统管理 ══════ -->
+                <div v-if="page==='system'" class="fade-in">
+                    <div class="card"><div class="card-header"><span class="card-title">⚙️ 系统管理</span></div>
+                        <div class="two-col mb-4"><div class="stat-card blue m-0"><div class="stat-accent"></div><div class="stat-label">系统版本</div><div class="stat-value text-lg">v3.2</div></div><div class="stat-card green m-0"><div class="stat-accent"></div><div class="stat-label">大模型</div><div class="stat-value text-lg">通义千问 Plus</div></div></div>
+                        <h4 class="mb-3 font-semibold">数据管理</h4>
+                        <div class="flex gap-3 flex-wrap mb-4"><button class="btn btn-sm" style="background:var(--brand-gradient);color:white" @click="exportData('conversations')">📥 导出谈心记录</button><button class="btn btn-success btn-sm" @click="exportData('emotions')">📥 导出情绪日志</button><button class="btn btn-warning btn-sm" @click="exportData('alerts')">📥 导出预警记录</button><button class="btn btn-outline btn-sm" @click="reSeedData()">🔄 重新生成测试数据</button></div>
+                        <h4 class="mb-3 font-semibold">功能模块</h4>
+                        <div class="text-sm text-secondary leading-loose">✅ 场景化提示词引擎 · ✅ RAG知识库检索增强 · ✅ 多模态实时情绪识别 · ✅ 风险预警系统 · ✅ 三级权限管理 · ✅ 操作日志审计</div></div>
+                </div>
+
+                <!-- ══════════════ 学生端页面 ══════════════ -->
+
+                <!-- 学生首页 -->
+                <div v-if="page==='studentHome'" class="fade-in">
+                    <div class="card bg-brand-gradient border-none text-white mb-5">
+                        <div class="flex justify-between items-center"><div><h2 class="text-2xl font-bold mb-1">你好，{{ currentUser.name||currentUser.username }}</h2><p class="opacity-80 text-sm">{{ todayStr }} · {{ greetingText }}</p></div><div class="avatar avatar-xl" style="background:rgba(255,255,255,0.2);font-size:28px">{{ (currentUser.name||'?')[0] }}</div></div></div>
+                    <div class="two-col mb-5">
+                        <div class="widget"><div class="widget-header"><span class="widget-icon" v-html="Icons.render('water')"></span><span>今日饮水</span></div>
+                            <div class="flex items-center gap-5"><div class="relative" style="width:80px;height:80px"><svg viewBox="0 0 100 100" style="width:80px;height:80px"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--bg-tertiary)" stroke-width="7"/><circle cx="50" cy="50" r="40" fill="none" stroke="var(--brand-500)" stroke-width="7" :stroke-dasharray="251.2" :stroke-dashoffset="251.2*(1-waterProgress)" stroke-linecap="round" transform="rotate(-90 50 50)" class="water-ring-progress"/></svg><div class="absolute inset-0 flex flex-col items-center justify-center" style="line-height:1"><span style="font-size:22px;font-weight:700">{{ waterCount }}</span><span style="font-size:11px;color:var(--text-tertiary)">/8杯</span></div></div><div class="flex gap-2"><button @click="addWater" class="btn btn-sm" style="background:var(--brand-500);color:white">💧 记录一杯</button></div></div></div>
+                        <div class="widget"><div class="widget-header"><span class="widget-icon" v-html="Icons.render('lightbulb')"></span><span>今日灵感</span></div><div class="quote-card"><div class="quote-mark">"</div><p class="text-sm text-secondary leading-relaxed mb-2" style="font-style:italic">{{ dailyQuote.text }}</p><p class="text-xs text-muted text-right">—— {{ dailyQuote.author }}</p></div></div>
+                        <div class="widget word-card"><div class="widget-header"><span class="widget-icon" v-html="Icons.render('book')"></span><span>每日英语</span></div><div class="word-en">{{ dailyWord.word }}</div><div class="text-sm text-muted mb-1">{{ dailyWord.phonetic }}</div><div class="text-sm text-secondary mb-2">{{ dailyWord.meaning }}</div><div class="text-xs text-muted" style="font-style:italic">"{{ dailyWord.sentence }}"</div></div>
+                        <div class="widget"><div class="widget-header"><span class="widget-icon" v-html="Icons.render('mood')"></span><span>今日心情</span></div><div class="mood-selector mb-3"><div class="mood-option" :class="{selected:todayMood==='happy'}" @click="recordMood('happy')" title="开心">😊</div><div class="mood-option" :class="{selected:todayMood==='calm'}" @click="recordMood('calm')" title="平静">😌</div><div class="mood-option" :class="{selected:todayMood==='neutral'}" @click="recordMood('neutral')" title="一般">😐</div><div class="mood-option" :class="{selected:todayMood==='down'}" @click="recordMood('down')" title="低落">😔</div><div class="mood-option" :class="{selected:todayMood==='anxious'}" @click="recordMood('anxious')" title="焦虑">😰</div></div><p class="text-center text-sm text-muted">{{ todayMoodText }}</p></div></div>
+                    <div class="grid-3 gap-3"><div @click="page='studentChat'" class="widget text-center cursor-pointer p-5"><div class="mb-2 text-brand" v-html="Icons.render('chat')"></div><div class="font-semibold text-sm">联系老师</div><div class="text-xs text-muted mt-1">{{ studentUnreadCount?studentUnreadCount+' 条未读':'暂无新消息' }}</div></div>
+                        <div @click="page='studentAppointment'" class="widget text-center cursor-pointer p-5"><div class="mb-2 text-brand" v-html="Icons.render('calendar')"></div><div class="font-semibold text-sm">预约咨询</div><div class="text-xs text-muted mt-1">面对面谈心</div></div>
+                        <div @click="page='studentProfile'" class="widget text-center cursor-pointer p-5"><div class="mb-2 text-brand" v-html="Icons.render('user')"></div><div class="font-semibold text-sm">个人中心</div><div class="text-xs text-muted mt-1">查看个人信息</div></div></div>
+                </div>
+
+                <!-- 学生联系老师 -->
+                <div v-if="page==='studentChat'" class="fade-in">
+                    <div class="card card-flush"><div class="chat-layout" style="height:calc(100vh - 150px)">
+                        <div class="chat-sidebar"><div class="p-4 font-bold text-base border-b">💬 消息</div>
+                            <div v-for="contact in messageContacts" :key="contact.id" @click="selectContactHandler(contact)" class="flex items-center gap-3 p-3 cursor-pointer border-b border-light transition" :class="{'bg-brand-50':selectedContact&&selectedContact.id===contact.id}"><div class="avatar">{{ contact.name[0] }}</div><div class="flex-1 min-w-0"><div class="flex justify-between items-center"><span class="font-semibold text-sm">{{ contact.name }}老师</span><span v-if="contact.unread_count" class="badge badge-danger badge-sm">{{ contact.unread_count }}</span></div><div v-if="contact.last_message" class="text-xs text-muted mt-1 truncate">{{ contact.last_message.content }}</div></div></div>
+                            <div v-if="!messageContacts.length" class="empty-state p-8">暂无消息</div></div>
+                        <div class="chat-main">
+                            <div v-if="selectedContact" class="flex items-center justify-between p-3 px-4 border-b"><span class="font-bold text-base">{{ selectedContact.name }}老师</span>
+                                <button @click="startVideoCall" v-if="!isInCall" class="btn btn-sm" style="background:var(--brand-gradient);color:white">📹 视频</button>
+                                <template v-else><div class="flex gap-2 items-center"><span class="emotion-live-indicator active"></span><span class="text-xs text-success">通话中</span><button @click="toggleVideo" class="btn btn-xs" :class="isVideoEnabled?'btn-outline':'btn-danger'">📷</button><button @click="toggleAudio" class="btn btn-xs" :class="isAudioEnabled?'btn-outline':'btn-danger'">🎤</button><button @click="endVideoCall" class="btn btn-danger btn-xs">挂断</button></div></template></div>
+                            <!-- 微信式视频：大画面(对方) + 右下小窗(自己) -->
+                            <div v-if="isInCall" class="relative bg-dark" style="height:400px;border-radius:8px;overflow:hidden">
+                                <video ref="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
+                                <div class="video-label">{{ selectedContact?selectedContact.name+'老师':'对方' }}</div>
+                                <div class="absolute" style="bottom:16px;right:16px;width:120px;height:160px;border-radius:8px;overflow:hidden;border:2px solid rgba(255,255,255,0.3);box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:10">
+                                    <video ref="localVideo" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover"></video>
+                                    <div class="video-label">我</div>
+                                </div>
+                            </div>
+                                                        <div v-if="incomingStudentCall" class="flex items-center justify-between p-3 mx-4 my-2 bg-brand-50 rounded-md border" style="border-color:var(--brand-500)"><span class="font-semibold">📞 {{ incomingStudentCall.teacher_name||'老师' }} 邀请你视频通话</span><div class="flex gap-2"><button @click="acceptStudentCall" class="btn btn-success btn-xs">接听</button><button @click="rejectStudentCall" class="btn btn-danger btn-xs">拒绝</button></div></div>
+                            <div v-if="selectedContact" class="flex-1 overflow-y-auto p-4 bg-tertiary" ref="studentMsgRef"><div v-for="msg in chatMessages" :key="msg.id" class="flex mb-3" :class="msg.sender_type==='student'?'justify-end':'justify-start'"><div class="bubble" :class="msg.sender_type==='student'?'bubble-sent':'bubble-received'">{{ msg.content }}<div class="bubble-time">{{ Helpers.formatTime(msg.created_at) }}</div></div></div></div>
+                            <div v-else class="flex-1 flex items-center justify-center text-muted">👈 选择联系人开始聊天</div>
+                            <div v-if="selectedContact" class="p-3 border-t bg-secondary">
+                                <div v-if="showEmoji" class="grid mb-2" style="grid-template-columns:repeat(10,1fr);gap:4px;max-height:200px;overflow-y:auto;background:var(--bg-tertiary);padding:var(--space-2);border-radius:var(--radius-md)"><span v-for="e in emojiList" :key="e" @click="insertEmoji(e)" style="font-size:20px;cursor:pointer;padding:4px;text-align:center;border-radius:4px">{{ e }}</span></div>
+                                <div class="chat-compose-row"><button @click="showEmoji=!showEmoji" class="btn btn-ghost chat-emoji-btn">&#128522;</button><textarea class="input chat-compose-input" v-model="newMessage" @keydown.enter.exact.prevent="sendStudentMsg" placeholder="&#36755;&#20837;&#28040;&#24687;..." rows="1" @input="autoResize"></textarea><button @click="sendStudentMsg" :disabled="!newMessage.trim()" class="btn btn-primary chat-send-btn">&#21457;&#36865;</button></div></div>
+                        </div>
+                    </div></div>
+                </div>
+
+                <!-- 学生预约 -->
+                <div v-if="page==='studentAppointment'" class="fade-in">
+                    <div class="card"><div class="card-header"><span class="card-title">📅 预约咨询</span></div><div class="two-col gap-6">
+                        <div><h4 class="mb-4 font-semibold">创建新预约</h4><div class="form-group"><label>选择辅导员</label><select class="input" v-model="newAppointment.counselor_id"><option value="">请选择辅导员</option><option v-for="c in counselors" :key="c.id" :value="c.id">{{ c.display_name }} - {{ c.college }}</option></select></div><div class="form-group"><label>预约时间</label><input class="input" v-model="newAppointment.appointment_time" type="datetime-local"></div><div class="form-group"><label>咨询原因</label><textarea class="input" v-model="newAppointment.reason" rows="3" placeholder="请简要描述咨询原因..."></textarea></div><button @click="createAppointment" class="btn btn-primary w-full">提交预约</button></div>
+                        <div><h4 class="mb-4 font-semibold">我的预约</h4><div v-for="appt in appointments" :key="appt.id" class="p-4 bg-tertiary rounded-md mb-3"><div class="flex justify-between items-center mb-2"><span class="font-semibold">{{ appt.counselor_name||'辅导员' }}</span><span class="badge" :class="'badge-'+({confirmed:'success',pending:'warning',completed:'brand',cancelled:'muted'}[appt.status])">{{ {pending:'待确认',confirmed:'已确认',completed:'已完成',cancelled:'已取消'}[appt.status] }}</span></div><div class="text-sm text-secondary"><div>时间：{{ appt.appointment_time }}</div><div v-if="appt.reason">原因：{{ appt.reason }}</div></div></div><div v-if="!appointments.length" class="empty-state p-8">暂无预约记录</div></div></div></div>
+                </div>
+
+                <!-- 心理测评（分步导航） -->
+                <div v-if="page==='studentAssessment'" class="fade-in">
+                    <div v-if="!assessmentResult"><div class="card"><div class="card-header"><span class="card-title">📋 心理状态自评（PHQ-9 / GAD-7 / ISI）</span><span class="text-xs text-muted">共23题 · 约5-8分钟</span></div>
+                        <div class="assess-progress-bar"><div class="assess-progress-fill" :style="{width:assessmentProgress+'%'}"></div></div>
+                        <div class="assessment-steps"><div class="assess-step" :class="{active:assessmentStep===0, done:assessmentStep>0}" @click="assessmentStep=0"><span class="assess-step-num">1</span> PHQ-9 抑郁</div><span class="assess-step-arrow">→</span><div class="assess-step" :class="{active:assessmentStep===1, done:assessmentStep>1}" @click="assessmentStep=1"><span class="assess-step-num">2</span> GAD-7 焦虑</div><span class="assess-step-arrow">→</span><div class="assess-step" :class="{active:assessmentStep===2}" @click="assessmentStep=2"><span class="assess-step-num">3</span> ISI 睡眠</div></div>
+                        <h4 class="mb-3 text-brand font-semibold">{{ assessmentStepLabel }}</h4>
+                        <p class="text-secondary text-sm mb-4">请根据<span class="font-semibold">过去两周</span>的实际情况如实作答。</p>
+                        <div v-for="(q,i) in currentStepQuestions" :key="currentStepStart+i" class="mb-4 p-3 bg-tertiary rounded-md"><div class="font-semibold mb-2 text-sm">{{ currentStepStart+i+1 }}. {{ q.text }}</div><div class="flex gap-2 flex-wrap">
+                            <label v-for="(opt,j) in assessmentOptions" :key="j" :style="{padding:'8px 14px',borderRadius:'var(--radius-sm)',cursor:'pointer',fontSize:'var(--text-xs)',border:'2px solid',borderColor:assessmentAnswers[currentStepStart+i]===j?'var(--brand-500)':'var(--border-color)',background:assessmentAnswers[currentStepStart+i]===j?'var(--brand-50)':'var(--bg-secondary)',minWidth:'44px',textAlign:'center',transition:'all var(--transition-fast)'}"><input type="radio" :value="j" v-model="assessmentAnswers[currentStepStart+i]" style="position:absolute;opacity:0" :aria-label="opt">{{ opt }}</label></div></div>
+                        <div class="flex justify-between items-center mt-5"><button v-if="assessmentStep>0" @click="goToPrevStep" class="btn btn-outline btn-sm">← 上一部分</button><div v-else></div><div class="flex gap-3 items-center"><span class="text-xs text-muted">进度 {{ assessmentProgress }}%</span><button v-if="assessmentStep<2" @click="goToNextStep" class="btn btn-sm" style="background:var(--brand-gradient);color:white">下一部分 →</button><button v-else @click="submitAssessment" :disabled="assessmentSubmitting||!canProceedToNext()" class="btn btn-success btn-sm">{{ assessmentSubmitting?'提交中...':'✓ 提交测评' }}</button></div></div></div></div>
+                    <!-- 测评结果 -->
+                    <div v-else class="fade-in"><div class="card text-center mb-4"><div style="font-size:48px;margin-bottom:12px">{{ assessmentResult.suggestions&&assessmentResult.suggestions.length>1?'🟡':'🟢' }}</div><h3 class="mb-4">测评完成</h3>
+                        <div class="grid-3 gap-3 mb-4"><div class="p-4 bg-tertiary rounded-lg"><div class="text-xs text-muted">抑郁 PHQ-9</div><div class="text-2xl font-bold text-brand">{{ assessmentResult.scores.phq9 }}</div><div class="text-xs" :style="{color:assessmentResult.levels.phq9==='正常'?'var(--success)':'var(--danger)'}">{{ assessmentResult.levels.phq9 }}</div></div><div class="p-4 bg-tertiary rounded-lg"><div class="text-xs text-muted">焦虑 GAD-7</div><div class="text-2xl font-bold text-brand">{{ assessmentResult.scores.gad7 }}</div><div class="text-xs" :style="{color:assessmentResult.levels.gad7==='正常'?'var(--success)':'var(--warning)'}">{{ assessmentResult.levels.gad7 }}</div></div><div class="p-4 bg-tertiary rounded-lg"><div class="text-xs text-muted">失眠 ISI</div><div class="text-2xl font-bold text-brand">{{ assessmentResult.scores.isi }}</div><div class="text-xs" :style="{color:assessmentResult.levels.isi==='正常'?'var(--success)':'var(--warning)'}">{{ assessmentResult.levels.isi }}</div></div></div>
+                        <div v-if="assessmentResult.suggestions&&assessmentResult.suggestions.length" class="text-left p-4 bg-warning-bg rounded-md border-l-warning"><div class="font-semibold mb-2">💡 建议</div><div v-for="(s,i) in assessmentResult.suggestions" :key="i" class="text-sm mb-1">· {{ s }}</div></div>
+                        <button @click="resetAssessment" class="btn btn-sm mt-4" style="background:var(--brand-gradient);color:white">重新测评</button></div>
+                        <div class="card" v-if="assessmentHistory.length>1"><div class="card-header"><span class="card-title">历史测评记录</span></div><div v-for="(h,i) in assessmentHistory" :key="i" class="flex justify-between items-center py-2 border-b border-light text-sm"><span>{{ h.created_at }}</span><span>PHQ-9: <b>{{ h.phq9_score }}</b> GAD-7: <b>{{ h.gad7_score }}</b> ISI: <b>{{ h.isi_score }}</b></span></div></div></div>
+                </div>
+
+                <!-- 学生个人中心 -->
+                <div v-if="page==='studentProfile'" class="fade-in">
+                    <div class="card"><div class="card-header"><span class="card-title">个人中心</span></div><div class="flex gap-6 items-start"><div class="avatar avatar-xl">{{ (currentUser.name||'?')[0] }}</div><div class="flex-1"><h3 class="mb-3 m-0">{{ currentUser.name }}</h3><div class="text-secondary leading-loose text-sm"><div>学号：{{ currentUser.student_id }}</div><div>学院：{{ currentUser.college||'未设置' }}</div><div>班级：{{ currentUser.class_name||'未设置' }}</div></div></div></div></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast-container" :class="{'top-right': teacherInCall||isInCall}" role="alert" aria-live="polite">
+        <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">{{ t.message }}</div>
+    </div>
+</div>
+
+<!-- ═══════════ 脚本 ═══════════ -->
+<!-- Vue 3 生产版 (130KB vs 571KB 开发版，加载快4倍) -->
+<script src="/static/vue.global.prod.js?v=4.1"></script>
+<!-- ECharts 按需加载 (仪表盘/情绪看板) -->
+<script id="echarts-loader">
+(function(){window._loadECharts=function(cb){if(window.echarts)return cb();var s=document.createElement('script');s.src='/static/echarts.min.js?v=4.1';s.onload=cb;document.head.appendChild(s);};})();
+</script>
+<!-- 核心库 -->
+<script src="/static/marked.min.js?v=4.1" defer></script>
+<script src="/static/socket.io.min.js?v=4.1" defer></script>
+<!-- face-api.js 按需加载 (仅视频通话) -->
+<script id="faceapi-loader">
+(function(){window._loadFaceAPI=function(cb){if(window.faceapi)return cb();var s=document.createElement('script');s.src='/static/js/vendor/face-api.min.js';s.onload=cb;s.onerror=function(){var f=document.createElement('script');f.src='https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';f.onload=cb;document.head.appendChild(f);};document.head.appendChild(s);};})();
+</script>
+<!-- 应用工具 -->
+<script src="/static/js/utils/icons.js?v=4.1"></script>
+<script src="/static/js/utils/toast.js?v=4.1"></script>
+<script src="/static/js/utils/api.js?v=4.1"></script>
+<script src="/static/js/utils/helpers.js?v=4.1"></script>
+<script src="/static/js/realtime/face-detector.js?v=5.3"></script>
+<script src="/static/js/realtime/voice-analyzer.js?v=4.4"></script>
+<script src="/static/js/realtime/emotion-fusion.js?v=4.8"></script>
+<script src="/static/js/network-graph.js?v=5.4"></script>
+<script src="/static/js/app.js?v=5.5"></script>
+</body>
+</html>
+

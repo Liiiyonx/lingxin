@@ -1,0 +1,36 @@
+# 环境变量与密钥（含 API Key，严禁提交）
+.env
+
+# 数据库
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 模型文件（体积大，不纳入版本控制）
+*.pt
+*.pth
+*.onnx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# 输出与渲染产物
+outputs/
+.qa_render/
+
+# 音频样本
+audio_samples/*.wav
+audio_samples/*.mp3
+audio_samples/*.flac
+
+# 日志
+*.log
+
+# IDE / 编辑器
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,2025 @@
+﻿<!DOCTYPE html>
+
+<html lang="zh-CN">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>聆心 v3.0 - 高校辅导员AI辅助平台</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+
+        :root {
+            /* Light Theme */
+            --bg-primary: #f5f7fa;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f0f2f5;
+            --text-primary: #1a1a2e;
+            --text-secondary: #606266;
+            --text-tertiary: #909399;
+            --border-color: #e4e7ed;
+            --border-light: #ebeef5;
+            --accent-primary: #6366f1;
+            --accent-secondary: #818cf8;
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: #16213e;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-tertiary: #64748b;
+            --border-color: #2d3748;
+            --border-light: #1e293b;
+            --accent-primary: #818cf8;
+            --accent-secondary: #a78bfa;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.3);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background 0.3s, color 0.3s;
+        }
+
+        .app-header {
+            background: var(--accent-gradient);
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .app-header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+
+        .app-header .subtitle { font-size: 13px; opacity: 0.85; margin-left: 12px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; }
+
+        .app-container { display: flex; min-height: calc(100vh - 64px); }
+
+        .sidebar {
+            width: 240px;
+            background: var(--bg-secondary);
+            padding: 20px 0;
+            box-shadow: var(--shadow-md);
+            border-right: 1px solid var(--border-color);
+            transition: background 0.3s;
+        }
+
+        .sidebar .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 24px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            margin: 2px 8px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .sidebar .menu-item:hover { background: rgba(99, 102, 241, 0.08); color: var(--accent-primary); }
+
+        .sidebar .menu-item.active {
+            background: rgba(99, 102, 241, 0.12);
+            color: var(--accent-primary);
+            border-left-color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .main-content { flex: 1; padding: 24px; overflow-y: auto; }
+
+        .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card .label { font-size: 13px; color: var(--text-tertiary); margin-bottom: 8px; }
+
+        .stat-card .value { font-size: 28px; font-weight: 700; }
+
+        .stat-card.blue .value { color: var(--accent-primary); }
+        .stat-card.blue { border-top: 3px solid var(--accent-primary); }
+
+        .stat-card.green .value { color: var(--success); }
+        .stat-card.green { border-top: 3px solid var(--success); }
+
+        .stat-card.orange .value { color: var(--warning); }
+        .stat-card.orange { border-top: 3px solid var(--warning); }
+
+        .stat-card.red .value { color: var(--danger); }
+        .stat-card.red { border-top: 3px solid var(--danger); }
+
+        .panel {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            margin-bottom: 24px;
+            transition: background 0.3s, border-color 0.3s;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+
+        .alert-item:hover { transform: translateX(4px); }
+
+        .alert-item.high { background: rgba(239, 68, 68, 0.08); border-left: 4px solid var(--danger); }
+
+        .alert-item.medium { background: rgba(245, 158, 11, 0.08); border-left: 4px solid var(--warning); }
+
+        .alert-item.low { background: rgba(16, 185, 129, 0.08); border-left: 4px solid var(--success); }
+
+        .level-badge {
+            margin-left: auto;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .chat-box {
+            display: flex;
+            flex-direction: column;
+            height: 400px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            background: var(--bg-secondary);
+        }
+
+        .chat-messages { flex: 1; overflow-y: auto; padding: 16px; background: var(--bg-tertiary); }
+
+        .chat-msg {
+            max-width: 80%;
+            margin-bottom: 12px;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .chat-msg h1,.chat-msg h2,.chat-msg h3,.chat-msg h4 { margin: 12px 0 6px; font-size: 15px; color: var(--text-primary); }
+
+        .chat-msg h1 { font-size: 17px; border-bottom: 2px solid var(--border-color); padding-bottom: 6px; }
+
+        .chat-msg h2 { font-size: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; }
+
+        .chat-msg table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+
+        .chat-msg th,.chat-msg td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
+
+        .chat-msg th { background: var(--bg-tertiary); font-weight: 600; }
+
+        .chat-msg ul,.chat-msg ol { padding-left: 20px; margin: 6px 0; }
+
+        .chat-msg li { margin: 3px 0; }
+
+        .chat-msg strong { color: var(--text-primary); }
+
+        .chat-msg hr { border: none; border-top: 1px solid var(--border-color); margin: 12px 0; }
+
+        .chat-msg code { background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+
+        .chat-msg.user {
+            background: var(--accent-gradient);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-msg.assistant {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border-color); background: var(--bg-secondary); }
+
+        .chat-input input, .chat-input textarea {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .chat-input input:focus, .chat-input textarea:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+
+        .chat-input button {
+            padding: 10px 20px;
+            background: var(--accent-gradient);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .chat-input button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+
+        .chat-input button:disabled { background: var(--border-color); cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .scene-tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+
+        .scene-tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            transition: all 0.2s;
+        }
+
+        .scene-tab:hover { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(99, 102, 241, 0.05); }
+
+        .scene-tab.active {
+            background: var(--accent-gradient);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        }
+
+        .login-box {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-box::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .login-form {
+            background: var(--bg-secondary);
+            padding: 48px;
+            border-radius: 24px;
+            width: 420px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.25);
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-form h2 { text-align: center; margin-bottom: 8px; font-size: 28px; }
+
+        .login-form .tagline { text-align: center; color: var(--text-tertiary); font-size: 14px; margin-bottom: 32px; }
+
+        .login-form .form-group { margin-bottom: 20px; }
+
+        .login-form label { display: block; font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; font-weight: 500; }
+
+        .login-form input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .login-form input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+
+        .login-form button {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent-gradient);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: all 0.2s;
+        }
+
+        .login-form button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99, 102, 241, 0.35); }
+
+        .emotion-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+
+        .emotion-bar .el { font-size: 13px; color: var(--text-secondary); min-width: 50px; }
+
+        .emotion-bar .bar-bg { flex: 1; height: 20px; background: var(--bg-tertiary); border-radius: 10px; overflow: hidden; }
+
+        .emotion-bar .bar-fill { height: 100%; border-radius: 10px; transition: width 0.6s; }
+
+        .emotion-bar .pct { font-size: 12px; color: var(--text-tertiary); min-width: 40px; }
+
+        .empty-state { text-align: center; padding: 40px; color: var(--text-tertiary); }
+
+        .fade-in { animation: fadeIn 0.3s ease; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .loading-spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #dcdfe6; border-top-color: #1a73e8; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+        .scene-tab { transition: all 0.2s ease; }
+        .scene-tab:hover { transform: translateY(-1px); }
+
+        /* 深色模式下的额外样式 */
+        [data-theme="dark"] .login-form { background: #1a1a2e; border: 1px solid #2d3748; }
+        [data-theme="dark"] input,
+        [data-theme="dark"] select,
+        [data-theme="dark"] textarea {
+            background: #16213e;
+            border-color: #2d3748;
+            color: #e2e8f0;
+        }
+        [data-theme="dark"] input::placeholder,
+        [data-theme="dark"] textarea::placeholder { color: #64748b; }
+        [data-theme="dark"] .stbl tbody tr:hover td { background: rgba(99, 102, 241, 0.08); }
+
+
+    
+/* Competition upgrades */
+@media(max-width:1200px){.stat-cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.stat-cards{grid-template-columns:1fr}.login-form{width:auto;margin:16px;padding:32px 24px}.sidebar{width:60px}.sidebar .menu-text{opacity:0}.main-content{margin-left:60px;padding:16px}}
+.stat-card{transition:transform .2s ease,box-shadow .2s ease}
+.stat-card:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,.1)}
+/* Student table */
+.stbl{width:100%;border-collapse:collapse;font-size:14px}
+.stbl th{background:var(--bg-tertiary);padding:12px 16px;text-align:left;font-weight:600;border-bottom:2px solid var(--border-color);white-space:nowrap;color:var(--text-secondary)}
+.stbl td{padding:12px 16px;border-bottom:1px solid var(--border-light);color:var(--text-primary)}
+.stbl tr:hover td{background:rgba(99, 102, 241, 0.04)}
+.stbl .act-btn{padding:6px 14px;border:none;border-radius:8px;cursor:pointer;font-size:12px;margin-right:6px;transition:all 0.2s}
+.stbl .act-btn.primary{background:var(--accent-gradient);color:white}
+.stbl .act-btn.primary:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(99, 102, 241, 0.3)}
+
+/* Calendar grid */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:13px}
+.cal-grid .cal-head{padding:10px 0;font-weight:600;color:var(--text-secondary);background:var(--bg-tertiary);border-radius:8px}
+.cal-grid .cal-day{padding:8px 4px;min-height:56px;border:1px solid var(--border-light);border-radius:8px;cursor:default;position:relative;transition:all 0.2s}
+.cal-grid .cal-day:hover:not(.empty){background:rgba(99, 102, 241, 0.04)}
+.cal-grid .cal-day.today{background:rgba(99, 102, 241, 0.1);border-color:var(--accent-primary);font-weight:600}
+.cal-grid .cal-day.empty{background:transparent;border-color:transparent}
+.cal-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin:1px}
+.cal-day-dots{display:flex;justify-content:center;gap:2px;flex-wrap:wrap;margin-top:2px}
+
+/* Emotion trend area */
+.emo-trend-area{width:100%;height:280px;min-height:280px}
+
+/* Student profile cards */
+.stu-profile-card{background:var(--bg-secondary);border-radius:16px;padding:24px;box-shadow:var(--shadow-sm);border:1px solid var(--border-color);margin-bottom:12px;transition:all 0.2s}
+.stu-profile-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.stu-profile-card .stu-avatar{width:64px;height:64px;border-radius:50%;background:var(--accent-gradient);color:white;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin-bottom:12px}
+.stu-profile-card .stu-info{font-size:14px;color:var(--text-secondary);line-height:2}
+.stu-profile-card .stu-info strong{color:var(--text-primary)}
+
+/* Reminder cards */
+.rem-card{display:flex;align-items:flex-start;gap:12px;padding:16px 20px;border-radius:12px;margin-bottom:10px;transition:all .2s;border:1px solid var(--border-light)}
+.rem-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.rem-card.high{background:rgba(239, 68, 68, 0.06);border-left:4px solid var(--danger)}
+.rem-card.medium{background:rgba(245, 158, 11, 0.06);border-left:4px solid var(--warning)}
+.rem-card.low{background:rgba(16, 185, 129, 0.06);border-left:4px solid var(--success)}
+.rem-card.done{opacity:.6;text-decoration:line-through}
+.rem-priority{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;color:white;white-space:nowrap}
+.rem-priority.high{background:var(--danger)}
+.rem-priority.medium{background:var(--warning)}
+.rem-priority.low{background:var(--success)}
+.rem-card .rem-content{flex:1;font-size:14px;color:var(--text-primary)}
+.rem-card .rem-time{font-size:12px;color:var(--text-tertiary);margin-top:4px}
+
+/* Add student dialog overlay */
+.dialog-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s}
+.dialog-box{background:var(--bg-secondary);border-radius:20px;padding:32px;width:480px;max-width:90vw;box-shadow:var(--shadow-lg);border:1px solid var(--border-color)}
+.dialog-box h3{margin-bottom:20px;font-size:20px;color:var(--text-primary);font-weight:700}
+.dialog-box label{display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px;margin-top:16px;font-weight:500}
+.dialog-box input,.dialog-box select,.dialog-box textarea{width:100%;padding:10px 14px;border:1px solid var(--border-color);border-radius:10px;font-size:14px;outline:none;background:var(--bg-secondary);color:var(--text-primary);transition:all 0.2s}
+.dialog-box input:focus,.dialog-box textarea:focus{border-color:var(--accent-primary);box-shadow:0 0 0 3px rgba(99, 102, 241, 0.15)}
+.dialog-box textarea{resize:vertical;min-height:80px}
+.dialog-btns{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}
+.dialog-btns button{padding:10px 24px;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.2s}
+.dialog-btns .btn-cancel{background:var(--bg-tertiary);color:var(--text-secondary)}
+.dialog-btns .btn-cancel:hover{background:var(--border-color)}
+.dialog-btns .btn-ok{background:var(--accent-gradient);color:white}
+.dialog-btns .btn-ok:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(99, 102, 241, 0.3)}
+</style>
+
+</head>
+
+<body>
+
+<div id="app">
+
+    <div v-if="!isLoggedIn" class="login-box">
+
+        <div class="login-form">
+
+            <h2>🧠 聆心</h2>
+
+            <p class="tagline">高校辅导员AI减负与心理预警一体化平台</p>
+
+            <!-- 登录类型切换 -->
+            <div style="display:flex;gap:8px;margin-bottom:24px;background:var(--bg-tertiary);padding:4px;border-radius:12px;">
+                <button @click="loginType='staff'" :style="{flex:1,padding:'10px',border:'none',borderRadius:'10px',cursor:'pointer',fontSize:'14px',fontWeight:'600',transition:'all 0.2s',background:loginType==='staff'?'var(--accent-gradient)':'transparent',color:loginType==='staff'?'white':'var(--text-secondary)'}">
+                    👨‍🏫 辅导员/管理员
+                </button>
+                <button @click="loginType='student'" :style="{flex:1,padding:'10px',border:'none',borderRadius:'10px',cursor:'pointer',fontSize:'14px',fontWeight:'600',transition:'all 0.2s',background:loginType==='student'?'var(--accent-gradient)':'transparent',color:loginType==='student'?'white':'var(--text-secondary)'}">
+                    🎓 学生登录
+                </button>
+            </div>
+
+            <!-- 辅导员/管理员登录表单 -->
+            <div v-if="loginType==='staff'">
+                <div class="form-group"><label>用户名</label><input v-model="loginForm.username" placeholder="请输入用户名" @keyup.enter="handleLogin"></div>
+                <div class="form-group"><label>密码</label><input v-model="loginForm.password" type="password" placeholder="请输入密码" @keyup.enter="handleLogin"></div>
+                <button @click="handleLogin" :disabled="loginLoading">{{ loginLoading ? '登录中...' : '登 录' }}</button>
+                <!-- 测试账号提示 -->
+                <div style="margin-top:20px;padding:12px;background:var(--bg-tertiary);border-radius:10px;font-size:12px;color:var(--text-tertiary);">
+                    <div style="font-weight:600;margin-bottom:6px;color:var(--text-secondary);">📋 测试账号</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <span @click="loginForm.username='admin';loginForm.password='admin123'" style="padding:4px 8px;background:var(--bg-secondary);border-radius:6px;cursor:pointer;border:1px solid var(--border-color);">管理员: admin</span>
+                        <span @click="loginForm.username='zhangwei';loginForm.password='counsel123'" style="padding:4px 8px;background:var(--bg-secondary);border-radius:6px;cursor:pointer;border:1px solid var(--border-color);">辅导员: zhangwei</span>
+                        <span @click="loginForm.username='liuxin';loginForm.password='staff123'" style="padding:4px 8px;background:var(--bg-secondary);border-radius:6px;cursor:pointer;border:1px solid var(--border-color);">学工处: liuxin</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 学生登录表单 -->
+            <div v-else>
+                <div v-if="!showStudentRegister">
+                    <div class="form-group"><label>学号</label><input v-model="studentLoginForm.student_id" placeholder="请输入学号" @keyup.enter="handleStudentLogin"></div>
+                    <div class="form-group"><label>密码</label><input v-model="studentLoginForm.password" type="password" placeholder="请输入密码" @keyup.enter="handleStudentLogin"></div>
+                    <button @click="handleStudentLogin" :disabled="loginLoading">{{ loginLoading ? '登录中...' : '登 录' }}</button>
+                    <p style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-tertiary);">
+                        首次使用？<a href="#" @click.prevent="showStudentRegister=true" style="color:var(--accent-primary);text-decoration:none;font-weight:500;">点击注册</a>
+                    </p>
+                    <!-- 测试账号提示 -->
+                    <div style="margin-top:16px;padding:12px;background:var(--bg-tertiary);border-radius:10px;font-size:12px;color:var(--text-tertiary);">
+                        <div style="font-weight:600;margin-bottom:6px;color:var(--text-secondary);">📋 测试账号（密码均为 123456）</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <span @click="studentLoginForm.student_id='2022001';studentLoginForm.password='123456'" style="padding:4px 8px;background:var(--bg-secondary);border-radius:6px;cursor:pointer;border:1px solid var(--border-color);">2022001 王小明</span>
+                            <span @click="studentLoginForm.student_id='2022002';studentLoginForm.password='123456'" style="padding:4px 8px;background:var(--bg-secondary);border-radius:6px;cursor:pointer;border:1px solid var(--border-color);">2022002 李思远</span>
+                            <span @click="studentLoginForm.student_id='2022003';studentLoginForm.password='123456'" style="padding:4px 8px;background:var(--bg-secondary);border-radius:6px;cursor:pointer;border:1px solid var(--border-color);">2022003 张雨婷</span>
+                            <span @click="studentLoginForm.student_id='2022004';studentLoginForm.password='123456'" style="padding:4px 8px;background:var(--bg-secondary);border-radius:6px;cursor:pointer;border:1px solid var(--border-color);">2022004 陈浩然</span>
+                            <span @click="studentLoginForm.student_id='2022005';studentLoginForm.password='123456'" style="padding:4px 8px;background:var(--bg-secondary);border-radius:6px;cursor:pointer;border:1px solid var(--border-color);">2022005 刘诗琪</span>
+                        </div>
+                    </div>
+                </div>
+                <div v-else>
+                    <div class="form-group"><label>学号</label><input v-model="studentRegisterForm.student_id" placeholder="请输入学号"></div>
+                    <div class="form-group"><label>姓名</label><input v-model="studentRegisterForm.name" placeholder="请输入姓名"></div>
+                    <div class="form-group"><label>密码</label><input v-model="studentRegisterForm.password" type="password" placeholder="设置密码（至少6位）"></div>
+                    <div class="form-group"><label>确认密码</label><input v-model="studentRegisterForm.confirmPassword" type="password" placeholder="再次输入密码"></div>
+                    <button @click="handleStudentRegister" :disabled="loginLoading">{{ loginLoading ? '注册中...' : '注 册' }}</button>
+                    <p style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-tertiary);">
+                        已有账号？<a href="#" @click.prevent="showStudentRegister=false" style="color:var(--accent-primary);text-decoration:none;font-weight:500;">返回登录</a>
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div v-else>
+
+        <header class="app-header">
+
+            <div style="display:flex;align-items:center;"><h1>🧠 聆心</h1><span class="subtitle">v3.0</span></div>
+
+            <div style="display:flex;align-items:center;gap:16px;">
+
+                <button @click="toggleTheme" :title="isDarkMode?'切换浅色模式':'切换深色模式'" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:white;padding:8px 12px;border-radius:10px;cursor:pointer;font-size:16px;transition:all 0.2s;backdrop-filter:blur(4px);">
+                    {{ isDarkMode ? '☀️' : '🌙' }}
+                </button>
+
+                <span>👤 {{ currentUser.display_name || currentUser.username }}</span>
+
+                <span style="opacity:0.8;background:rgba(255,255,255,0.15);padding:4px 12px;border-radius:20px;font-size:12px;">{{ roleLabel }}</span>
+
+                <button @click="handleLogout" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:white;padding:8px 16px;border-radius:10px;cursor:pointer;font-size:13px;transition:all 0.2s;backdrop-filter:blur(4px);">退出</button>
+
+            </div>
+
+        </header>
+
+        <div class="app-container">
+
+            <nav class="sidebar">
+
+                <!-- 辅导员/管理员菜单 -->
+                <template v-if="currentUser.role !== 'student'">
+                    <div class="menu-item" :class="{active:page==='dashboard'}" @click="page='dashboard'"><span>📋</span><span>今日工作台</span></div>
+                    <div class="menu-item" :class="{active:page==='chat'}" @click="page='chat'"><span>💬</span><span>谈心助手</span></div>
+                    <div class="menu-item" :class="{active:page==='emotion'}" @click="page='emotion';loadEmotionLogs()"><span>🎭</span><span>情绪识别</span></div>
+                    <div class="menu-item" :class="{active:page==='alerts'}" @click="page='alerts';loadAlerts()"><span>🚨</span><span>风险预警</span></div>
+                    <div class="menu-item" :class="{active:page==='knowledge'}" @click="page='knowledge';loadKbStats()"><span>📚</span><span>知识库</span></div>
+                    <div class="menu-item" :class="{active:page==='system'}" @click="page='system'"><span>⚙️</span><span>系统管理</span></div>
+                    <div class="menu-item" :class="{active:page==='students'}" @click="page='students';loadStudents()"><span>👥</span><span>学生管理</span></div>
+                    <div class="menu-item" :class="{active:page==='emotionBoard'}" @click="page='emotionBoard';loadCalendar();loadEmoTrend()"><span>📊</span><span>情绪看板</span></div>
+                    <div class="menu-item" :class="{active:page==='reminders'}" @click="page='reminders';loadReminders()"><span>🔔</span><span>提醒中心</span></div>
+                </template>
+
+                <!-- 学生菜单 -->
+                <template v-else>
+                    <div class="menu-item" :class="{active:page==='studentHome'}" @click="page='studentHome'"><span>🏠</span><span>我的首页</span></div>
+                    <div class="menu-item" :class="{active:page==='studentChat'}" @click="page='studentChat';loadMessageContacts()"><span>💬</span><span>联系辅导员</span></div>
+                    <div class="menu-item" :class="{active:page==='studentAppointment'}" @click="page='studentAppointment';loadAppointments()"><span>📅</span><span>预约咨询</span></div>
+                    <div class="menu-item" :class="{active:page==='videoCall'}" @click="page='videoCall'"><span>📹</span><span>视频咨询</span></div>
+                    <div class="menu-item" :class="{active:page==='studentProfile'}" @click="page='studentProfile'"><span>👤</span><span>个人中心</span></div>
+                </template>
+
+            </nav>
+
+            <main class="main-content">
+
+                <div v-if="page==='dashboard'" class="fade-in">
+
+                    <!-- 顶部统计卡片 -->
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                        <h3 style="font-size:18px;font-weight:600;">📋 今日工作台</h3>
+                        <span style="font-size:13px;color:#606266;">{{ wp.date }} {{ wp.weekday }} | 待办 {{ wp.todo_count }} 项</span>
+                    </div>
+
+                    <div class="stat-cards">
+                        <div class="stat-card blue" @click="page='students'" style="cursor:pointer;">
+                            <div class="label">👥 学生总数</div>
+                            <div class="value">{{ wp.student_summary.total||0 }}</div>
+                        </div>
+                        <div class="stat-card red" @click="page='students'" style="cursor:pointer;">
+                            <div class="label">🔴 高风险</div>
+                            <div class="value">{{ wp.student_summary.high_risk||0 }}</div>
+                            <div style="font-size:11px;color:#909399;margin-top:4px;">每日跟进</div>
+                        </div>
+                        <div class="stat-card orange">
+                            <div class="label">🟡 中风险</div>
+                            <div class="value">{{ wp.student_summary.medium_risk||0 }}</div>
+                            <div style="font-size:11px;color:#909399;margin-top:4px;">每周跟进</div>
+                        </div>
+                        <div class="stat-card green">
+                            <div class="label">✅ 待办事项</div>
+                            <div class="value">{{ wp.todo_count||0 }}</div>
+                            <div style="font-size:11px;color:#909399;margin-top:4px;">今日需完成</div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+                        <!-- 左侧：日历 -->
+                        <div class="panel" style="margin-bottom:0;">
+                            <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+                                <span>📅 日历</span>
+                                <span style="font-size:13px;color:#606266;">{{ wpCalYear }}年{{ wpCalMonth }}月</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                <button @click="wpCalPrev" style="padding:4px 12px;border:1px solid #dcdfe6;border-radius:6px;cursor:pointer;background:white;">◀</button>
+                                <span style="font-size:14px;font-weight:600;">{{ wpCalYear }}年{{ wpCalMonth }}月</span>
+                                <button @click="wpCalNext" style="padding:4px 12px;border:1px solid #dcdfe6;border-radius:6px;cursor:pointer;background:white;">▶</button>
+                            </div>
+                            <table style="width:100%;border-collapse:collapse;text-align:center;font-size:13px;">
+                                <thead><tr>
+                                    <th style="padding:6px;color:#909399;">日</th><th style="padding:6px;color:#909399;">一</th><th style="padding:6px;color:#909399;">二</th><th style="padding:6px;color:#909399;">三</th><th style="padding:6px;color:#909399;">四</th><th style="padding:6px;color:#909399;">五</th><th style="padding:6px;color:#909399;">六</th>
+                                </tr></thead>
+                                <tbody><tr v-for="(row,ri) in wpCalRows" :key="ri">
+                                    <td v-for="(cell,ci) in row" :key="ci" :style="{padding:'4px 2px',background:cell&&cell.isToday?'#ecf5ff':'',borderRadius:'6px',cursor:cell?'pointer':'',position:'relative',minHeight:'48px',verticalAlign:'top'}" @click="cell&&wpSelectDay(cell.day)">
+                                        <div v-if="cell" style="min-height:48px;">
+                                            <div :style="{fontWeight:cell.isToday?'700':'400',color:cell.isToday?'#1a73e8':'#303133',marginBottom:'2px'}">{{ cell.day }}</div>
+                                            <div v-for="(ev,ei) in cell.events.slice(0,3)" :key="ei" :style="{fontSize:'10px',padding:'1px 3px',borderRadius:'3px',marginBottom:'1px',color:'white',background:ev.type==='high_risk'?'#f56c6c':ev.priority==='high'?'#f56c6c':ev.priority==='medium'?'#e6a23c':'#67c23a',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}" :title="ev.title">{{ ev.title.length>6?ev.title.substring(0,6)+'..':ev.title }}</div>
+                                            <div v-if="cell.events.length>3" style="font-size:10px;color:#909399;">+{{ cell.events.length-3 }}条</div>
+                                        </div>
+                                    </td>
+                                </tr></tbody>
+                            </table>
+                        </div>
+
+                        <!-- 右侧：今日待办 -->
+                        <div class="panel" style="margin-bottom:0;max-height:520px;overflow-y:auto;">
+                            <div class="panel-title">📝 今日待办</div>
+                            <div v-if="wp.todo_list.length">
+                                <div v-for="t in wp.todo_list" :key="t.id" :style="{display:'flex',alignItems:'flex-start',gap:'10px',padding:'10px 12px',borderRadius:'8px',marginBottom:'6px',background:t.priority==='high'?'#fef0f0':t.priority==='medium'?'#fdf6ec':'#f0f9eb',borderLeft:'4px solid '+(t.priority==='high'?'#f56c6c':t.priority==='medium'?'#e6a23c':'#67c23a')}">
+                                    <div style="flex:1;">
+                                        <div style="font-size:14px;font-weight:600;color:#303133;">{{ t.title }}</div>
+                                        <div style="font-size:12px;color:#909399;margin-top:2px;">{{ t.student_name }} {{ t.student_id?'#'+t.student_id:'' }} | {{ t.due_date }}</div>
+                                        <div v-if="t.description" style="font-size:12px;color:#606266;margin-top:4px;">{{ t.description }}</div>
+                                    </div>
+                                    <button v-if="t.type!=='high_risk'&&t.type!=='medium_risk'" @click="wpCompleteTodo(t.id)" style="padding:4px 10px;border:1px solid #67c23a;border-radius:6px;color:#67c23a;background:white;cursor:pointer;font-size:12px;white-space:nowrap;">✓ 完成</button>
+                                    <button v-else @click="page='chat'" style="padding:4px 10px;border:1px solid #1a73e8;border-radius:6px;color:#1a73e8;background:white;cursor:pointer;font-size:12px;white-space:nowrap;">💬 去谈心</button>
+                                </div>
+                            </div>
+                            <div v-else style="text-align:center;color:#909399;padding:40px;">🎉 今日暂无待办，一切顺利！</div>
+                        </div>
+
+                    </div>
+
+                    <!-- 底部：需关注的学生列表 -->
+                    <div class="panel" style="margin-top:16px;">
+                        <div class="panel-title">⚠️ 需重点关注的学生</div>
+                        <table class="stbl">
+                            <thead><tr><th>学号</th><th>姓名</th><th>班级</th><th>情绪状态</th><th>风险等级</th><th>备注</th><th>操作</th></tr></thead>
+                            <tbody>
+                                <tr v-for="s in wpRiskStudents" :key="s.student_id">
+                                    <td>{{ s.student_id }}</td>
+                                    <td style="font-weight:600;">{{ s.name }}</td>
+                                    <td>{{ s.class_name }}</td>
+                                    <td><span :style="{color:emoColor(s.emotion_status)}">{{ s.emotion_status }}</span></td>
+                                    <td><span class="level-badge" :style="{background:riskBg(s.risk_level)}">{{ riskLbl(s.risk_level) }}</span></td>
+                                    <td style="font-size:12px;color:#909399;">{{ s.notes||'-' }}</td>
+                                    <td><button class="act-btn primary" @click="page='chat'" style="font-size:12px;">谈心</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+
+<div v-if="page==='chat'" class="fade-in">
+
+                    <div class="panel">
+
+                        <div class="panel-title">💬 AI谈心记录助手</div>
+
+                        <div class="scene-tabs">
+
+                            <div class="scene-tab" :class="{active:chatScene==='谈心记录'}" @click="chatScene='谈心记录'">📝 谈心记录</div>
+
+                            <div class="scene-tab" :class="{active:chatScene==='班会策划'}" @click="chatScene='班会策划'">📋 班会策划</div>
+
+                            <div class="scene-tab" :class="{active:chatScene==='公文写作'}" @click="chatScene='公文写作'">📄 公文写作</div>
+
+                            <div class="scene-tab" :class="{active:chatScene==='情绪分析'}" @click="chatScene='情绪分析'">🧠 情绪分析</div>
+
+                        </div>
+
+                        <div class="chat-box" style="height:450px;">
+
+                            <div class="chat-messages" ref="chatMsg">
+
+                                <div v-for="(m,i) in chatHistory" :key="i" class="chat-msg" :class="m.role" v-html="renderMd(m.content)"></div>
+
+                                <div v-if="chatLoading" class="chat-msg assistant"><em>生成中...</em></div>
+
+                            </div>
+
+                            <div v-if="selectedFile" style="padding:6px 12px;border-top:1px solid #f0f2f5;background:#fafafa;display:flex;align-items:center;gap:10px;">
+
+                                <img v-if="previewUrl" :src="previewUrl" style="max-height:50px;border-radius:6px;border:1px solid #dcdfe6;">
+
+                                <span v-else style="font-size:24px;">📄</span>
+                                <span style="font-size:12px;color:#606266;">{{ selectedFile.name||'已选择文件' }}</span>
+
+                                <button @click="clearImage" style="padding:2px 8px;font-size:12px;border:1px solid #f56c6c;color:#f56c6c;background:white;border-radius:4px;cursor:pointer;">移除</button>
+
+                            </div>
+
+                            <div style="padding:8px 12px;border-top:1px solid #ebeef5;background:white;display:flex;flex-direction:column;gap:6px;">
+
+                                <textarea v-model="chatInput" :placeholder="chatInputPlaceholder" @keydown.enter.exact.prevent="sendChat" @paste="handlePaste" rows="2" style="width:100%;padding:8px 12px;border:1px solid #dcdfe6;border-radius:8px;font-size:14px;outline:none;resize:none;font-family:inherit;line-height:1.5;" :disabled="chatLoading"></textarea>
+
+                                <div style="display:flex;align-items:center;gap:8px;">
+
+                                    <span style="font-size:12px;color:#c0c4cc;">Ctrl+V 粘贴截图 | 支持 PDF/Word/图片/文本</span>
+
+                                    <label style="padding:6px 12px;background:#67c23a;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;white-space:nowrap;">📎 上传文件<input type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.bmp" @change="handleFileUpload" style="display:none;"></label>
+                                    <div style="flex:1;"></div>
+
+                                    <button @click="sendChat" :disabled="chatLoading||(!chatInput.trim()&&!selectedFile)" style="padding:7px 20px;background:#1a73e8;color:white;border:none;border-radius:8px;cursor:pointer;">{{ chatLoading ? '发送中...' : '发送' }}</button>
+
+                                </div>
+
+                            </div>
+
+                </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <div v-if="page==='emotion'" class="fade-in">
+
+                    <div class="panel" style="padding:16px;">
+
+                        <div class="panel-title" style="margin-bottom:8px;padding-bottom:8px;">🎭 语音情绪识别</div>
+
+                        <div style="border:2px dashed #dcdfe6;border-radius:10px;padding:16px 12px;text-align:center;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;">
+
+                            <div style="font-size:28px;">🎤</div>
+
+                            <p style="color:#606266;font-size:13px;margin:0;">上传语音文件（WAV/MP3），AI自动识别情绪</p>
+
+                            <input type="file" accept=".wav,.mp3,.flac" @change="uploadAudio" style="display:none;" ref="audioInput">
+
+                            <button @click="$refs.audioInput.click()" style="padding:6px 16px;background:#1a73e8;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;">选择文件</button>
+
+                        </div>
+
+                        <div v-if="emoResult" style="background:#f5f7fa;border-radius:8px;padding:12px;margin-bottom:12px;">
+
+                            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+
+                                <div style="text-align:center;background:white;border-radius:8px;padding:10px 0;"><div style="font-size:12px;color:#909399;">情绪类型</div><div style="font-size:18px;font-weight:700;">{{ emoResult.emotion }}</div></div>
+
+                                <div style="text-align:center;background:white;border-radius:8px;padding:10px 0;"><div style="font-size:12px;color:#909399;">情绪强度</div><div style="font-size:18px;font-weight:700;">{{ emoResult.intensity }}/10</div></div>
+
+                                <div style="text-align:center;background:white;border-radius:8px;padding:10px 0;"><div style="font-size:12px;color:#909399;">风险等级</div><div style="font-size:18px;font-weight:700;" :style="{color:riskBg(emoResult.risk_level)}">{{ riskLbl(emoResult.risk_level) }}</div></div>
+
+                            </div>
+
+                        </div>
+
+                        <div v-if="emoLogs.length" style="max-height:200px;overflow-y:auto;">
+
+                            <div v-for="l in emoLogs" :key="l.id" style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0f2f5;font-size:13px;">
+
+                                <span style="color:#909399;">{{ l.created_at }}</span>
+
+                                <span style="font-weight:600;">{{ l.student_name }}</span>
+
+                                <span>{{ l.emotion }} · {{ l.intensity }}/10</span>
+
+                                <span class="level-badge" style="margin-left:auto;font-size:11px;padding:1px 8px;" :style="{background:riskBg(l.risk_level)}">{{ riskLbl(l.risk_level) }}</span>
+
+                            </div>
+
+                        </div><div v-else class="empty-state" style="padding:16px;">暂无记录</div>
+
+                    </div>
+
+                </div>
+
+
+
+                <div v-if="page==='alerts'" class="fade-in">
+
+                    <div class="panel" style="padding:16px;"><div class="panel-title" style="margin-bottom:8px;padding-bottom:8px;">🚨 风险预警中心</div>
+
+                        <div v-if="alerts.length" style="max-height:calc(100vh - 180px);overflow-y:auto;">
+
+                            <div v-for="a in alerts" :key="a.id" class="alert-item" :class="a.risk_level" style="padding:8px 12px;margin-bottom:6px;font-size:13px;">
+
+                                <span style="font-weight:600;">{{ a.student_name }}</span>
+
+                                <span style="font-size:12px;color:#909399;">{{ a.student_class }}</span>
+
+                                <span>{{ a.emotion_type }} · {{ a.intensity }}/10</span>
+
+                                <span class="level-badge" style="margin-left:auto;" :style="{background:riskBg(a.risk_level)}">{{ riskLbl(a.risk_level) }}</span>
+
+                                <button v-if="a.status==='pending'" @click="ackAlert(a.id)" style="padding:3px 8px;font-size:12px;border:1px solid #dcdfe6;border-radius:4px;background:white;cursor:pointer;">确认</button>
+
+                                <span v-else style="font-size:12px;color:#67c23a;">✅ {{ a.status==='resolved'?'已解决':'已确认' }}</span>
+
+                            </div>
+
+                        </div><div v-else class="empty-state">🎉 暂无预警</div>
+
+                    </div>
+
+                </div>
+
+
+
+                <div v-if="page==='knowledge'" class="fade-in">
+
+                    <div class="panel" style="padding:16px;"><div class="panel-title" style="margin-bottom:8px;padding-bottom:8px;">📚 知识库管理</div>
+
+                        <p style="color:#909399;font-size:13px;margin-bottom:10px;">上传学校规章制度文档，AI基于文档内容回答问题</p>
+
+                        <div style="display:flex;gap:10px;align-items:center;">
+
+                            <button @click="$refs.docInput.click()" style="padding:6px 16px;background:#67c23a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;">📄 上传文档</button>
+
+                            <input type="file" accept=".pdf,.txt,.docx,.md" @change="uploadDoc" style="display:none;" ref="docInput">
+
+                            <span v-if="kbStats" style="font-size:13px;color:#606266;">文档: <b>{{ kbStats.doc_count||0 }}</b> · 文本块: <b>{{ kbStats.chunk_count||0 }}</b></span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <div v-if="page==='system'" class="fade-in">
+
+                    <div class="panel"><div class="panel-title">⚙️ 系统管理</div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+
+                            <div class="stat-card blue"><div class="label">系统版本</div><div class="value" style="font-size:18px;">v3.0</div></div>
+
+                            <div class="stat-card green"><div class="label">大模型</div><div class="value" style="font-size:18px;">通义千问4 Turbo</div></div>
+
+                        </div>
+
+                        <h4 style="margin-bottom:8px;">功能模块</h4>
+
+                        <div style="font-size:14px;color:#606266;line-height:2;">✅ 场景化提示词引擎<br>✅ RAG知识库检索增强<br>✅ 多模态情绪识别<br>✅ 风险预警系统<br>✅ 三级权限管理<br>✅ 操作日志审计</div>
+
+                    </div>
+
+                </div>
+
+                <!-- 学生管理页面 -->
+                <div v-if="page==='students'" class="fade-in">
+                    <div class="panel">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                            <div class="panel-title" style="margin-bottom:0;border-bottom:none;padding-bottom:0;">👥 学生管理</div>
+                            <div style="display:flex;gap:10px;align-items:center;">
+                                <input v-model="studentSearch" @input="loadStudents()" placeholder="搜索学号/姓名..." style="padding:8px 14px;border:1px solid #dcdfe6;border-radius:8px;font-size:14px;outline:none;width:220px;" />
+                                <button @click="showAddStudent=true" style="padding:8px 18px;background:#1a73e8;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">+ 添加学生</button>
+                            </div>
+                        </div>
+                        <table class="stbl">
+                            <thead>
+                                <tr><th>学号</th><th>姓名</th><th>班级</th><th>情绪状态</th><th>风险等级</th><th>操作</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="s in students" :key="s.student_id">
+                                    <td>{{s.student_id}}</td>
+                                    <td>{{s.name}}</td>
+                                    <td>{{s.class_name||'-'}}</td>
+                                    <td><span :style="{color:emoColor(s.emotion_status)||'#909399'}">{{s.emotion_status||'未知'}}</span></td>
+                                    <td><span class="level-badge" :style="{background:riskBg(s.risk_level)}">{{riskLbl(s.risk_level)}}</span></td>
+                                    <td>
+                                        <button class="act-btn primary" @click="viewStudent(s.student_id)">详情</button>
+                                    </td>
+                                </tr>
+                                <tr v-if="!students.length"><td colspan="6" style="text-align:center;color:#909399;padding:32px;">暂无学生数据</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 学生详情弹窗 -->
+                    <div v-if="selectedStudent" class="dialog-mask" @click.self="selectedStudent=null">
+                        <div class="dialog-box" style="width:560px;max-height:80vh;overflow-y:auto;">
+                            <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+                                <div class="stu-avatar">{{(selectedStudent.name||'?')[0]}}</div>
+                                <div>
+                                    <h3 style="margin-bottom:4px;">{{selectedStudent.name}} <span style="font-size:14px;color:#909399;font-weight:normal;">{{selectedStudent.student_id}}</span></h3>
+                                    <div style="font-size:13px;color:#606266;">{{selectedStudent.class_name||''}} | {{selectedStudent.college||''}}</div>
+                                </div>
+                            </div>
+                            <div class="stu-info">
+                                <div><strong>性别：</strong>{{selectedStudent.gender||'未设置'}}</div>
+                                <div><strong>手机：</strong>{{selectedStudent.phone||'未设置'}}</div>
+                                <div><strong>情绪状态：</strong><span :style="{color:emoColor(selectedStudent.emotion_status)}">{{selectedStudent.emotion_status||'未知'}}</span></div>
+                                <div><strong>风险等级：</strong><span class="level-badge" :style="{background:riskBg(selectedStudent.risk_level)}">{{riskLbl(selectedStudent.risk_level)}}</span></div>
+                                <div style="margin-top:8px;"><strong>备注：</strong></div>
+                                <textarea v-model="selectedStudent.notes" @blur="updateStudentNotes(selectedStudent.student_id,selectedStudent.notes)" placeholder="添加备注..." style="width:100%;margin-top:4px;"></textarea>
+                            </div>
+                            <div v-if="studentProfiles.length" style="margin-top:16px;">
+                                <h4 style="margin-bottom:8px;">📋 辅导记录</h4>
+                                <div v-for="(p,i) in studentProfiles" :key="i" style="padding:10px;background:#f5f7fa;border-radius:8px;margin-bottom:8px;font-size:13px;">
+                                    <div style="color:#909399;margin-bottom:4px;">{{p.created_at||''}}</div>
+                                    <div v-html="renderMd(p.content||p.summary||'')"></div>
+                                </div>
+                                <div v-if="!studentProfiles.length" style="color:#909399;font-size:13px;">暂无辅导记录</div>
+                            </div>
+                            <div class="dialog-btns">
+                                <button class="btn-cancel" @click="selectedStudent=null">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 添加学生弹窗 -->
+                    <div v-if="showAddStudent" class="dialog-mask" @click.self="showAddStudent=false">
+                        <div class="dialog-box">
+                            <h3>添加学生</h3>
+                            <label>学号</label>
+                            <input v-model="newStudent.student_id" placeholder="请输入学号" />
+                            <label>姓名</label>
+                            <input v-model="newStudent.name" placeholder="请输入姓名" />
+                            <label>性别</label>
+                            <select v-model="newStudent.gender"><option value="">请选择</option><option value="男">男</option><option value="女">女</option></select>
+                            <label>学院</label>
+                            <input v-model="newStudent.college" placeholder="请输入学院" />
+                            <label>班级</label>
+                            <input v-model="newStudent.class_name" placeholder="请输入班级" />
+                            <label>手机</label>
+                            <input v-model="newStudent.phone" placeholder="请输入手机号" />
+                            <label>备注</label>
+                            <textarea v-model="newStudent.notes" placeholder="备注信息..."></textarea>
+                            <div class="dialog-btns">
+                                <button class="btn-cancel" @click="showAddStudent=false">取消</button>
+                                <button class="btn-ok" @click="addStudent()">确定添加</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 情绪看板页面 -->
+                <div v-if="page==='emotionBoard'" class="fade-in">
+                    <div class="panel">
+                        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>📊 情绪看板</span>
+                            <span style="font-size:12px;color:#909399;">数据同步自今日工作台</span>
+                        </div>
+
+                        <!-- 工作台同步统计 -->
+                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+                            <div class="stat-card blue"><div class="label">👥 学生总数</div><div class="value" style="font-size:20px;">{{ wp.student_summary.total||0 }}</div></div>
+                            <div class="stat-card red"><div class="label">🔴 高风险</div><div class="value" style="font-size:20px;">{{ wp.student_summary.high_risk||0 }}</div></div>
+                            <div class="stat-card orange"><div class="label">🟡 中风险</div><div class="value" style="font-size:20px;">{{ wp.student_summary.medium_risk||0 }}</div></div>
+                            <div class="stat-card green"><div class="label">✅ 待办</div><div class="value" style="font-size:20px;">{{ wp.todo_count||0 }}</div></div>
+                        </div>
+
+                        <!-- 今日待办速览 -->
+                        <div v-if="wp.todo_list.length" style="margin-bottom:20px;">
+                            <h4 style="margin-bottom:8px;">📋 今日待办速览</h4>
+                            <div style="max-height:200px;overflow-y:auto;">
+                                <div v-for="t in wp.todo_list.slice(0,8)" :key="t.id" :style="{display:'flex',alignItems:'center',gap:'8px',padding:'6px 10px',borderRadius:'6px',marginBottom:'4px',fontSize:'13px',background:t.priority==='high'?'#fef0f0':t.priority==='medium'?'#fdf6ec':'#f0f9eb',borderLeft:'3px solid '+(t.priority==='high'?'#f56c6c':t.priority==='medium'?'#e6a23c':'#67c23a')}">
+                                    <span style="font-weight:600;">{{ t.title }}</span>
+                                    <span style="color:#909399;font-size:12px;margin-left:auto;">{{ t.student_name }}</span>
+                                </div>
+                                <div v-if="wp.todo_list.length>8" style="text-align:center;font-size:12px;color:#909399;padding:6px;">还有 {{ wp.todo_list.length-8 }} 条待办 →</div>
+                            </div>
+                        </div>
+
+                        <!-- 情绪趋势图 -->
+                        <div style="margin-bottom:24px;">
+                            <h4 style="margin-bottom:8px;">情绪趋势</h4>
+                            <div ref="emoTrend" class="emo-trend-area"></div>
+                        </div>
+                        <!-- 日历 -->
+                        <div style="margin-bottom:24px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                                <h4>情绪日历</h4>
+                                <div style="display:flex;align-items:center;gap:12px;">
+                                    <button @click="prevMonth()" style="padding:4px 12px;border:1px solid #dcdfe6;border-radius:6px;cursor:pointer;background:white;">◀</button>
+                                    <span style="font-size:15px;font-weight:600;">{{calYear}}年{{calMonth}}月</span>
+                                    <button @click="nextMonth()" style="padding:4px 12px;border:1px solid #dcdfe6;border-radius:6px;cursor:pointer;background:white;">▶</button>
+                                </div>
+                            </div>
+                            <div class="cal-grid">
+                                <div class="cal-head" v-for="w in weekdays" :key="w">{{w}}</div>
+                                <div v-for="(d,i) in getCalDays()" :key="'d'+i" class="cal-day" :class="{empty:!d,today:d&&calYear===new Date().getFullYear()&&calMonth===new Date().getMonth()+1&&d===new Date().getDate()}" @click="d&&clickCalDay(d)" style="cursor:pointer;">
+                                    <div>{{d||''}}</div>
+                                    <div class="cal-day-dots" v-if="d">
+                                        <span v-for="(ev,j) in getEventsForDay(d)" :key="j" class="cal-dot" :style="{background:ev.type==='high_risk'?'#f56c6c':ev.type==='follow_up'?'#e6a23c':emoColor(ev.emotion||'正常')}"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 本周小结 -->
+                        <div>
+                            <h4 style="margin-bottom:12px;">本周情绪小结</h4>
+                            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+                                <div class="stat-card blue"><div class="label">记录总数</div><div class="value" style="font-size:22px;">{{calEvents.length}}</div></div>
+                                <div class="stat-card green"><div class="label">积极情绪</div><div class="value" style="font-size:22px;">{{calEvents.filter(e=>['开心','平静','自信'].includes(e.emotion)).length}}</div></div>
+                                <div class="stat-card orange"><div class="label">需关注</div><div class="value" style="font-size:22px;">{{calEvents.filter(e=>['焦虑','抑郁','压抑'].includes(e.emotion)).length}}</div></div>
+                                <div class="stat-card red"><div class="label">高风险</div><div class="value" style="font-size:22px;">{{calEvents.filter(e=>e.risk==='high').length}}</div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 日历点击弹窗 -->
+                    <div v-if="calDayDetail.show" class="dialog-mask" @click.self="calDayDetail.show=false">
+                        <div class="dialog-box" style="width:500px;max-height:70vh;overflow-y:auto;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                                <h3 style="font-size:16px;">📅 {{ calDayDetail.date }} 的待办事项</h3>
+                                <button @click="calDayDetail.show=false" style="padding:4px 12px;border:1px solid #dcdfe6;border-radius:6px;cursor:pointer;background:white;">关闭</button>
+                            </div>
+                            <div v-if="calDayDetail.items.length">
+                                <div v-for="t in calDayDetail.items" :key="t.id" :style="{padding:'10px 12px',borderRadius:'8px',marginBottom:'8px',background:t.is_completed?'#f5f7fa':t.priority==='high'?'#fef0f0':t.priority==='medium'?'#fdf6ec':'#f0f9eb',borderLeft:'4px solid '+(t.priority==='high'?'#f56c6c':t.priority==='medium'?'#e6a23c':'#67c23a'),opacity:t.is_completed?0.6:1}">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="font-size:14px;font-weight:600;text-decoration:line-through;">{{ t.title }}</span>
+                                        <span style="font-size:12px;color:#909399;">{{ t.due_date }}</span>
+                                    </div>
+                                    <div style="font-size:12px;color:#606266;margin-top:4px;">{{ t.student_name }} {{ t.description }}</div>
+                                </div>
+                            </div>
+                            <div v-else style="text-align:center;color:#909399;padding:32px;">这一天暂无待办</div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 提醒中心页面 -->
+                <div v-if="page==='reminders'" class="fade-in">
+                    <div class="panel">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                            <div class="panel-title" style="margin-bottom:0;border-bottom:none;padding-bottom:0;">🔔 提醒中心</div>
+                            <div style="display:flex;gap:10px;align-items:center;">
+                                <label style="font-size:13px;color:#606266;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                                    <input type="checkbox" v-model="showCompleted" @change="loadReminders()" /> 显示已完成
+                                </label>
+                                <button @click="loadReminders()" style="padding:6px 14px;border:1px solid #dcdfe6;border-radius:6px;cursor:pointer;background:white;font-size:13px;">🔄 刷新</button>
+                            </div>
+                        </div>
+                        <div v-for="r in reminders.filter(r=>showCompleted||!r.completed)" :key="r.id" class="rem-card" :class="[r.priority,r.completed?'done':'']">
+                            <span class="rem-priority" :class="r.priority">{{r.priority==='high'?'高':r.priority==='medium'?'中':'低'}}</span>
+                            <div class="rem-content">
+                                <div>{{r.content||r.title||'无内容'}}</div>
+                                <div class="rem-time">{{r.created_at||''}} <span v-if="r.student_name">| {{r.student_name}}</span></div>
+                            </div>
+                            <button v-if="!r.completed" @click="completeReminder(r.id)" style="padding:4px 12px;background:#67c23a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;">✓ 完成</button>
+                            <span v-else style="color:#67c23a;font-size:13px;">✅ 已完成</span>
+                        </div>
+                        <div v-if="!reminders.length" style="text-align:center;color:#909399;padding:40px;">暂无提醒</div>
+                    </div>
+
+                </div>
+
+                <!-- ========== 学生端页面 ========== -->
+
+                <!-- 学生首页 -->
+                <div v-if="page==='studentHome'" class="fade-in">
+                    <div class="panel">
+                        <div class="panel-title">🏠 我的首页</div>
+                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;">
+                            <div class="stat-card blue">
+                                <div class="label">📋 我的信息</div>
+                                <div class="value" style="font-size:20px;">{{ currentUser.name || currentUser.student_id }}</div>
+                                <div style="font-size:12px;color:var(--text-tertiary);margin-top:4px;">{{ currentUser.class_name || '' }}</div>
+                            </div>
+                            <div class="stat-card green">
+                                <div class="label">💬 未读消息</div>
+                                <div class="value" style="font-size:20px;">{{ studentUnreadCount }}</div>
+                                <div style="font-size:12px;color:var(--text-tertiary);margin-top:4px;">点击查看详情</div>
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+                            <div @click="page='studentChat'" style="padding:20px;background:var(--bg-tertiary);border-radius:12px;text-align:center;cursor:pointer;transition:all 0.2s;">
+                                <div style="font-size:32px;margin-bottom:8px;">💬</div>
+                                <div style="font-weight:600;">联系辅导员</div>
+                            </div>
+                            <div @click="page='studentAppointment'" style="padding:20px;background:var(--bg-tertiary);border-radius:12px;text-align:center;cursor:pointer;transition:all 0.2s;">
+                                <div style="font-size:32px;margin-bottom:8px;">📅</div>
+                                <div style="font-weight:600;">预约咨询</div>
+                            </div>
+                            <div @click="page='studentProfile'" style="padding:20px;background:var(--bg-tertiary);border-radius:12px;text-align:center;cursor:pointer;transition:all 0.2s;">
+                                <div style="font-size:32px;margin-bottom:8px;">👤</div>
+                                <div style="font-weight:600;">个人中心</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 学生聊天页面 -->
+                <div v-if="page==='studentChat'" class="fade-in">
+                    <div class="panel" style="padding:0;overflow:hidden;">
+                        <div style="display:flex;height:calc(100vh - 150px);">
+                            <!-- 联系人列表 -->
+                            <div style="width:280px;border-right:1px solid var(--border-color);overflow-y:auto;">
+                                <div style="padding:16px;font-weight:600;border-bottom:1px solid var(--border-color);">💬 消息</div>
+                                <div v-for="contact in messageContacts" :key="contact.id"
+                                     @click="selectContact(contact)"
+                                     :style="{padding:'12px 16px',cursor:'pointer',borderBottom:'1px solid var(--border-light)',background:selectedContact&&selectedContact.id===contact.id?'rgba(99,102,241,0.08)':'',transition:'all 0.2s'}">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="font-weight:600;">{{ contact.name }}</span>
+                                        <span v-if="contact.unread_count" style="background:var(--danger);color:white;padding:2px 8px;border-radius:10px;font-size:11px;">{{ contact.unread_count }}</span>
+                                    </div>
+                                    <div v-if="contact.last_message" style="font-size:12px;color:var(--text-tertiary);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                        {{ contact.last_message.content }}
+                                    </div>
+                                </div>
+                                <div v-if="!messageContacts.length" style="padding:40px;text-align:center;color:var(--text-tertiary);">
+                                    暂无消息记录
+                                </div>
+                            </div>
+                            <!-- 聊天区域 -->
+                            <div style="flex:1;display:flex;flex-direction:column;">
+                                <div v-if="selectedContact" style="padding:16px;border-bottom:1px solid var(--border-color);font-weight:600;">
+                                    {{ selectedContact.name }}
+                                </div>
+                                <div v-if="selectedContact" style="flex:1;overflow-y:auto;padding:16px;" ref="studentChatMsg">
+                                    <div v-for="msg in chatMessages" :key="msg.id"
+                                         :style="{display:'flex',justifyContent:msg.sender_type==='student'?'flex-end':'flex-start',marginBottom:'12px'}">
+                                        <div :style="{maxWidth:'70%',padding:'10px 14px',borderRadius:'12px',fontSize:'14px',lineHeight:'1.5',
+                                            background:msg.sender_type==='student'?'var(--accent-gradient)':'var(--bg-tertiary)',
+                                            color:msg.sender_type==='student'?'white':'var(--text-primary)',
+                                            borderBottomRightRadius:msg.sender_type==='student'?'4px':'12px',
+                                            borderBottomLeftRadius:msg.sender_type==='counselor'?'4px':'12px'}">
+                                            {{ msg.content }}
+                                            <div style="font-size:11px;opacity:0.7;margin-top:4px;">{{ formatTime(msg.created_at) }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-else style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);">
+                                    选择联系人开始聊天
+                                </div>
+                                <div v-if="selectedContact" style="padding:12px;border-top:1px solid var(--border-color);display:flex;gap:8px;">
+                                    <input v-model="newMessage" @keyup.enter="sendMessage" placeholder="输入消息..." style="flex:1;padding:10px 14px;border:1px solid var(--border-color);border-radius:12px;outline:none;background:var(--bg-secondary);color:var(--text-primary);">
+                                    <button @click="sendMessage" style="padding:10px 20px;background:var(--accent-gradient);color:white;border:none;border-radius:12px;cursor:pointer;font-weight:600;">发送</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 学生预约页面 -->
+                <div v-if="page==='studentAppointment'" class="fade-in">
+                    <div class="panel">
+                        <div class="panel-title">📅 预约咨询</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                            <div>
+                                <h4 style="margin-bottom:16px;">创建新预约</h4>
+                                <div style="margin-bottom:12px;">
+                                    <label style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px;">选择辅导员</label>
+                                    <select v-model="newAppointment.counselor_id" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-secondary);color:var(--text-primary);">
+                                        <option value="">请选择辅导员</option>
+                                        <option v-for="c in counselors" :key="c.id" :value="c.id">{{ c.display_name }} - {{ c.college }}</option>
+                                    </select>
+                                </div>
+                                <div style="margin-bottom:12px;">
+                                    <label style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px;">预约时间</label>
+                                    <input v-model="newAppointment.appointment_time" type="datetime-local" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-secondary);color:var(--text-primary);">
+                                </div>
+                                <div style="margin-bottom:12px;">
+                                    <label style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px;">咨询原因</label>
+                                    <textarea v-model="newAppointment.reason" rows="3" placeholder="请简要描述咨询原因..." style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-secondary);color:var(--text-primary);resize:vertical;"></textarea>
+                                </div>
+                                <button @click="createAppointment" style="padding:12px 24px;background:var(--accent-gradient);color:white;border:none;border-radius:12px;cursor:pointer;font-weight:600;width:100%;">提交预约</button>
+                            </div>
+                            <div>
+                                <h4 style="margin-bottom:16px;">我的预约</h4>
+                                <div v-for="appt in appointments" :key="appt.id" style="padding:16px;background:var(--bg-tertiary);border-radius:12px;margin-bottom:12px;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                        <span style="font-weight:600;">{{ appt.counselor_name || '辅导员' }}</span>
+                                        <span :style="{padding:'4px 10px',borderRadius:'20px',fontSize:'12px',fontWeight:'600',color:'white',
+                                            background:appt.status==='confirmed'?'var(--success)':appt.status==='completed'?'var(--info)':appt.status==='cancelled'?'var(--text-tertiary)':'var(--warning)'}">
+                                            {{ {pending:'待确认',confirmed:'已确认',completed:'已完成',cancelled:'已取消'}[appt.status] || appt.status }}
+                                        </span>
+                                    </div>
+                                    <div style="font-size:13px;color:var(--text-secondary);">
+                                        <div>时间：{{ appt.appointment_time }}</div>
+                                        <div v-if="appt.reason">原因：{{ appt.reason }}</div>
+                                    </div>
+                                </div>
+                                <div v-if="!appointments.length" style="text-align:center;color:var(--text-tertiary);padding:40px;">
+                                    暂无预约记录
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 学生个人中心 -->
+                <div v-if="page==='studentProfile'" class="fade-in">
+                    <div class="panel">
+                        <div class="panel-title">👤 个人中心</div>
+                        <div style="display:flex;gap:24px;align-items:flex-start;">
+                            <div style="width:120px;height:120px;border-radius:50%;background:var(--accent-gradient);display:flex;align-items:center;justify-content:center;font-size:48px;color:white;font-weight:700;">
+                                {{ (currentUser.name || '?')[0] }}
+                            </div>
+                            <div style="flex:1;">
+                                <h3 style="margin-bottom:8px;">{{ currentUser.name }}</h3>
+                                <div style="color:var(--text-secondary);line-height:2;">
+                                    <div>学号：{{ currentUser.student_id }}</div>
+                                    <div>学院：{{ currentUser.college || '未设置' }}</div>
+                                    <div>班级：{{ currentUser.class_name || '未设置' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 视频咨询页面 -->
+                <div v-if="page==='videoCall'" class="fade-in">
+                    <div class="panel">
+                        <div class="panel-title">📹 视频咨询</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+                            <div style="background:#000;border-radius:12px;overflow:hidden;position:relative;aspect-ratio:4/3;">
+                                <video ref="localVideo" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+                                <div style="position:absolute;bottom:12px;left:12px;color:white;font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;">
+                                    我的视频
+                                </div>
+                            </div>
+                            <div style="background:#1a1a2e;border-radius:12px;overflow:hidden;position:relative;aspect-ratio:4/3;">
+                                <video ref="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+                                <div style="position:absolute;bottom:12px;left:12px;color:white;font-size:13px;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;">
+                                    {{ videoCallStatus }}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex;justify-content:center;gap:16px;">
+                            <button v-if="!isInCall" @click="startVideoCall" style="padding:12px 32px;background:var(--accent-gradient);color:white;border:none;border-radius:12px;cursor:pointer;font-weight:600;font-size:15px;">
+                                📹 开始视频咨询
+                            </button>
+                            <template v-else>
+                                <button @click="toggleVideo" :style="{padding:'12px 24px',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'600',background:isVideoEnabled?'var(--bg-tertiary)':'var(--danger)',color:isVideoEnabled?'var(--text-primary)':'white'}">
+                                    {{ isVideoEnabled ? '📷 关闭摄像头' : '📷 打开摄像头' }}
+                                </button>
+                                <button @click="toggleAudio" :style="{padding:'12px 24px',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'600',background:isAudioEnabled?'var(--bg-tertiary)':'var(--danger)',color:isAudioEnabled?'var(--text-primary)':'white'}">
+                                    {{ isAudioEnabled ? '🎤 静音' : '🎤 取消静音' }}
+                                </button>
+                                <button @click="endVideoCall" style="padding:12px 32px;background:var(--danger);color:white;border:none;border-radius:12px;cursor:pointer;font-weight:600;">
+                                    📵 结束通话
+                                </button>
+                            </template>
+                        </div>
+                        <div style="margin-top:24px;padding:16px;background:var(--bg-tertiary);border-radius:12px;">
+                            <h4 style="margin-bottom:12px;">💡 使用说明</h4>
+                            <ul style="color:var(--text-secondary);font-size:14px;line-height:2;padding-left:20px;">
+                                <li>点击"开始视频咨询"按钮发起视频通话</li>
+                                <li>首次使用需要允许浏览器访问摄像头和麦克风</li>
+                                <li>通话过程中可以随时关闭摄像头或静音</li>
+                                <li>建议在网络良好的环境下使用</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script src="/static/marked.min.js" ></script>
+
+<script src="/static/vue.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+<script>
+
+(function(){try{
+
+const {createApp,ref,reactive,computed,onMounted,nextTick,watch}=Vue;
+
+const API=location.origin+'/api';
+
+createApp({
+
+setup(){
+
+    const isLoggedIn=ref(!!localStorage.getItem('token'));
+
+    const loginForm=reactive({username:'',password:''});
+
+    const loginLoading=ref(false);
+
+    const currentUser=reactive({username:'',display_name:'',role:''});
+
+    const tk=ref(localStorage.getItem('token')||'');
+
+    const roleLabel=computed(()=>({super_admin:'超级管理员',student_affairs:'学工处',counselor:'辅导员',student:'学生'})[currentUser.role]||'');
+
+    // 学生登录相关
+    const loginType=ref('staff');
+    const showStudentRegister=ref(false);
+    const studentLoginForm=reactive({student_id:'',password:''});
+    const studentRegisterForm=reactive({student_id:'',name:'',password:'',confirmPassword:''});
+
+    // 深色模式
+    const isDarkMode=ref(localStorage.getItem('theme')==='dark');
+    function toggleTheme(){
+        isDarkMode.value=!isDarkMode.value;
+        document.documentElement.setAttribute('data-theme',isDarkMode.value?'dark':'');
+        localStorage.setItem('theme',isDarkMode.value?'dark':'light');
+    }
+    // 初始化主题
+    if(isDarkMode.value) document.documentElement.setAttribute('data-theme','dark');
+
+
+
+    async function api(path,opt={}){
+
+        const h={'Content-Type':'application/json',...opt.headers};
+
+        if(tk.value)h['Authorization']='Bearer '+tk.value;
+
+        const r=await fetch(API+path,{...opt,headers:h});
+
+        if(r.status===401){handleLogout();throw new Error('unauthorized');}
+
+        return r.json();
+
+    }
+
+
+
+    async function handleLogin(){
+
+        loginLoading.value=true;
+
+        try{
+
+            const d=await api('/auth/login',{method:'POST',body:JSON.stringify(loginForm)});
+
+            if(d.data&&d.data.token){tk.value=d.data.token;localStorage.setItem('token',d.data.token);Object.assign(currentUser,d.data.user||{});isLoggedIn.value=true;loadDash();}else if(d.token){tk.value=d.token;localStorage.setItem('token',d.token);Object.assign(currentUser,d.user||{});isLoggedIn.value=true;loadDash();}
+
+            else alert(d.message||d.error||'登录失败');
+
+        }catch(e){alert('连接失败');}
+
+        loginLoading.value=false;
+
+    }
+
+    function handleLogout(){tk.value='';localStorage.removeItem('token');localStorage.removeItem('user_type');isLoggedIn.value=false;loginType.value='staff';}
+
+    // 学生登录
+    async function handleStudentLogin(){
+        loginLoading.value=true;
+        try{
+            const d=await api('/student/login',{method:'POST',body:JSON.stringify(studentLoginForm)});
+            if(d.success && d.data && d.data.token){
+                tk.value=d.data.token;
+                localStorage.setItem('token',d.data.token);
+                localStorage.setItem('user_type','student');
+                Object.assign(currentUser,d.data.user||{});
+                currentUser.role='student';
+                isLoggedIn.value=true;
+                page.value='studentHome';
+            } else {
+                alert(d.message||'登录失败');
+            }
+        }catch(e){alert('连接失败');}
+        loginLoading.value=false;
+    }
+
+    // 学生注册
+    async function handleStudentRegister(){
+        if(studentRegisterForm.password !== studentRegisterForm.confirmPassword){
+            alert('两次密码输入不一致');
+            return;
+        }
+        if(studentRegisterForm.password.length < 6){
+            alert('密码长度至少6位');
+            return;
+        }
+        loginLoading.value=true;
+        try{
+            const d=await api('/student/register',{method:'POST',body:JSON.stringify({
+                student_id: studentRegisterForm.student_id,
+                name: studentRegisterForm.name,
+                password: studentRegisterForm.password,
+            })});
+            if(d.success && d.data && d.data.token){
+                tk.value=d.data.token;
+                localStorage.setItem('token',d.data.token);
+                localStorage.setItem('user_type','student');
+                Object.assign(currentUser,d.data.user||{});
+                currentUser.role='student';
+                isLoggedIn.value=true;
+                page.value='studentHome';
+            } else {
+                alert(d.message||'注册失败');
+            }
+        }catch(e){alert('连接失败');}
+        loginLoading.value=false;
+    }
+
+
+
+    const page=ref('dashboard');
+
+    const dash=reactive({conversations:0,emotions:0,alerts_pending:0,knowledge_docs:0,emotion_distribution:null});
+
+    const recentAlerts=ref([]);
+
+
+
+    async function loadDash(){
+
+        try{const d=await api('/system/dashboard');if(d){Object.assign(dash,d);setTimeout(renderCharts,200);}}catch(e){}
+
+        try{const d=await api('/alert/list?limit=5');recentAlerts.value=d.data||d.items||d.alerts||[];}catch(e){}
+
+    }
+
+
+
+    const chatScene=ref('谈心记录');
+
+    const chatHistory=ref([]);
+
+    const chatInput=ref('');
+
+    const chatInputPlaceholder=computed(()=>chatScene.value==='谈心记录'?"输入对话内容...":'输入内容...');
+
+    const chatLoading=ref(false);
+
+    const chatMsg=ref(null);
+
+
+
+    async function sendChat(){
+    if(!chatInput.value.trim() && !selectedFile.value) return;
+    if(selectedFile.value && !chatInput.value.trim()){ await uploadAndRecognize(); return; }
+
+        if(!chatInput.value.trim()||chatLoading.value)return;
+
+        const m=chatInput.value;chatHistory.value.push({role:'user',content:m});chatInput.value='';chatLoading.value=true;
+
+        await nextTick();if(chatMsg.value)chatMsg.value.scrollTop=chatMsg.value.scrollHeight;
+
+        try{const d=await api('/conversation/organize',{method:'POST',body:JSON.stringify({scene:chatScene.value,content:m})});chatHistory.value.push({role:'assistant',content:d.result||d.content||d.error||'无法生成'});}
+
+        catch(e){chatHistory.value.push({role:'assistant',content:'⚠ 连接失败，请确认API密钥已配置'});}
+
+        chatLoading.value=false;
+
+    }
+
+
+
+    const emoLogs=ref([]);const emoResult=ref(null);
+
+    async function loadEmotionLogs(){try{const d=await api('/emotion/logs');emoLogs.value=d.data||d.items||d.logs||[];}catch(e){}}
+
+    async function uploadAudio(e){
+
+        const f=e.target.files[0];if(!f)return;
+
+        const fd=new FormData();fd.append('audio_file',f);
+
+        try{const h={};if(tk.value)h['Authorization']='Bearer '+tk.value;const r=await fetch(API+'/emotion/analyze',{method:'POST',headers:h,body:fd});emoResult.value=await r.json();loadEmotionLogs();}catch(e){alert('分析失败');}
+
+    }
+
+
+
+    const alerts=ref([]);
+
+    async function loadAlerts(){try{const d=await api('/alert/list');alerts.value=d.data||d.items||d.alerts||[];}catch(e){}}
+
+    async function ackAlert(id){await api('/alert/'+id+'/acknowledge',{method:'PUT'});loadAlerts();}
+
+
+
+    const kbStats=ref(null);
+async function loadKbStats(){try{const d=await api('/knowledge/stats');if(d&&d.data)kbStats.value=d.data;}catch(e){}}
+
+    async function uploadDoc(e){
+
+        const f=e.target.files[0];if(!f)return;
+
+        const fd=new FormData();fd.append('file',f);
+
+        try{const h={};if(tk.value)h['Authorization']='Bearer '+tk.value;const r=await fetch(API+'/knowledge/upload',{method:'POST',headers:h,body:fd});const d=await r.json();alert(d.message||'上传成功');loadKbStats();}catch(e){alert('上传失败');}
+
+    }
+
+
+
+    function emoColor(e){return{正常:'#67c23a',高兴:'#409eff',低落:'#909399',焦虑:'#e6a23c',烦躁:'#f56c6c',压抑:'#9b59b6',愤怒:'#e74c3c',恐惧:'#8e44ad',惊讶:'#f39c12',厌恶:'#7f8c8d',悲伤:'#2c3e50',紧张:'#e67e22'}[e]||'#909399';}
+
+    function riskBg(l){return{high:'#f56c6c',medium:'#e6a23c',low:'#67c23a',none:'#c0c4cc'}[l]||'#c0c4cc';}
+
+    function riskLbl(l){return{high:'高风险',medium:'中风险',low:'低风险',none:'正常'}[l]||l;}
+
+
+
+    onMounted(()=>{
+        initSocket();
+        if(isLoggedIn.value){
+            if(localStorage.getItem('user_type')==='student'){
+                currentUser.role='student';
+                page.value='studentHome';
+                loadStudentData();
+            } else {
+                loadDash();loadWorkplan();setInterval(loadDash,30000);
+            }
+        }
+    });
+
+    watch(page,(p)=>{if(p==='dashboard')loadWorkplan();if(p==='students')loadStudents();if(p==='reminders')loadReminders();if(p==='emotionBoard'){loadCalendar();loadEmoTrend();}});
+
+
+
+    
+
+    
+
+    
+
+    function renderMd(text) {
+
+        if (!text) return '';
+
+        if (typeof marked !== 'undefined' && marked !== null && marked.parse) {
+
+            try { return marked.parse(text); } catch(e) {}
+
+        }
+
+        return text.replace(/\n/g, '<br>');
+
+    }
+
+
+
+    const previewUrl = ref('');
+const selectedFile = ref(null);
+const uploadingImage = ref(false);
+
+function handlePaste(e) {
+    const items = (e.clipboardData || window.clipboardData).items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+            e.preventDefault();
+            const blob = items[i].getAsFile();
+            selectedFile.value = blob;
+            previewUrl.value = URL.createObjectURL(blob);
+            return;
+        }
+        if (items[i].kind === 'file') {
+            e.preventDefault();
+            const blob = items[i].getAsFile();
+            selectedFile.value = blob;
+            previewUrl.value = blob.type.startsWith('image/') ? URL.createObjectURL(blob) : '';
+            return;
+        }
+    }
+}
+
+function handleFileUpload(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    selectedFile.value = f;
+    if (f.type.startsWith('image/')) {
+        previewUrl.value = URL.createObjectURL(f);
+    } else {
+        previewUrl.value = '';
+    }
+}
+
+function clearImage(){
+    selectedFile.value = null;
+    previewUrl.value = '';
+}
+
+async function uploadAndRecognize(){
+    if(!selectedFile.value) return;
+    uploadingImage.value = true;
+    chatLoading.value = true;
+    const f = selectedFile.value;
+    const fd = new FormData();
+    const isImage = f.type.startsWith('image/');
+    fd.append(isImage ? 'image' : 'file', f);
+    const displayName = f.name || (isImage ? '聊天截图' : '上传文件');
+    chatHistory.value.push({role:'user', content:'[上传了 ' + displayName + ']'});
+    clearImage();
+    await nextTick();
+    if(chatMsg.value) chatMsg.value.scrollTop = chatMsg.value.scrollHeight;
+    try{
+        const h = {};
+        if(tk.value) h['Authorization'] = 'Bearer ' + tk.value;
+        const url = isImage ? '/conversation/recognize-image' : '/conversation/upload-document';
+        const r = await fetch(API + url, {method:'POST', headers:h, body:fd});
+        const d = await r.json();
+        chatHistory.value.push({role:'assistant', content: d.content || d.message || d.error || '识别失败'});
+    } catch(e){
+        chatHistory.value.push({role:'assistant', content: '文件上传失败，请检查网络连接'});
+    }
+    chatLoading.value = false;
+    uploadingImage.value = false;
+    await nextTick();
+    if(chatMsg.value) chatMsg.value.scrollTop = chatMsg.value.scrollHeight;
+}
+
+// ECharts
+    const cPie=ref(null);const cTrend=ref(null);const cRisk=ref(null);
+    let pieChart=null;let trendChart=null;let riskChart=null;
+    function renderCharts(){
+      try{
+        if(typeof echarts==='undefined')return;
+        if(cPie.value){
+          if(pieChart)pieChart.dispose();pieChart=echarts.init(cPie.value);
+          const dist=dash.emotion_distribution||{};
+          const data=Object.entries(dist).map(([n,v])=>({name:n,value:v}));
+          pieChart.setOption({tooltip:{trigger:'item'},series:[{type:'pie',radius:['40%','70%'],label:{show:true},data:data.length?data:[{name:'暂无数据',value:1}],color:['#1a73e8','#67c23a','#e6a23c','#f56c6c','#9b59b6','#e74c3c']}]});
+        }
+        if(cTrend.value){
+          if(trendChart)trendChart.dispose();trendChart=echarts.init(cTrend.value);
+          const tr=dash.trend_data||[];
+          trendChart.setOption({tooltip:{trigger:'axis'},grid:{left:'10%',right:'5%',top:'10%',bottom:'15%'},xAxis:{type:'category',data:tr.map(t=>t.date)},yAxis:{type:'value',minInterval:1},series:[{type:'bar',data:tr.map(t=>t.count),itemStyle:{color:'#1a73e8',borderRadius:[4,4,0,0]},barWidth:'40%'}]});
+        }
+        if(cRisk.value){
+          if(riskChart)riskChart.dispose();riskChart=echarts.init(cRisk.value);
+          const rd=dash.risk_distribution||{};
+          riskChart.setOption({tooltip:{trigger:'item'},legend:{bottom:'5%'},series:[{type:'pie',radius:['35%','65%'],center:['50%','45%'],label:{show:true},data:[{name:'高风险',value:rd.high||0,itemStyle:{color:'#f56c6c'}},{name:'中风险',value:rd.medium||0,itemStyle:{color:'#e6a23c'}},{name:'低风险',value:rd.low||0,itemStyle:{color:'#67c23a'}}].filter(d=>d.value>0)}]});
+        }
+      }catch(e){console.error('Chart error:',e);}
+    }
+
+
+// Student management
+const students=ref([]);const studentSearch=ref('');const showAddStudent=ref(false);
+const newStudent=reactive({student_id:'',name:'',gender:'',college:'',class_name:'',phone:'',notes:''});
+const selectedStudent=ref(null);const studentProfiles=ref([]);
+
+async function loadStudents(){try{const d=await api('/student/list?search='+studentSearch.value+'&per_page=100');students.value=d.data||[];}catch(e){}}
+async function addStudent(){
+  try{await api('/student/add',{method:'POST',body:JSON.stringify(newStudent)});showToast('学生添加成功','tok');showAddStudent.value=false;Object.assign(newStudent,{student_id:'',name:'',gender:'',college:'',class_name:'',phone:'',notes:''});loadStudents();}catch(e){showToast('添加失败','ter');}
+}
+async function viewStudent(sid){
+  try{const d=await api('/student/'+sid);selectedStudent.value=d.data;
+  const p=await api('/student/'+sid+'/profiles');studentProfiles.value=p.data||[];
+  }catch(e){}
+}
+async function updateStudentNotes(sid,notes){
+  try{await api('/student/'+sid,{method:'PUT',body:JSON.stringify({notes:notes})});showToast('备注已更新','tok');}catch(e){}
+}
+
+// Calendar
+const calYear=ref(new Date().getFullYear());const calMonth=ref(new Date().getMonth()+1);
+const calEvents=ref([]);
+const weekdays=['日','一','二','三','四','五','六'];
+async function loadCalendar(){try{const d=await api('/student/calendar?year='+calYear.value+'&month='+calMonth.value);calEvents.value=d.data||[];}catch(e){}}
+function prevMonth(){if(calMonth.value===1){calMonth.value=12;calYear.value--;}else{calMonth.value--;}loadCalendar();}
+function nextMonth(){if(calMonth.value===12){calMonth.value=1;calYear.value++;}else{calMonth.value++;}loadCalendar();}
+function getCalDays(){
+  const first=new Date(calYear.value,calMonth.value-1,1);
+  const last=new Date(calYear.value,calMonth.value,0);
+  const days=[];
+  for(let i=0;i<first.getDay();i++)days.push(null);
+  for(let d=1;d<=last.getDate();d++)days.push(d);
+  return days;
+}
+function getEventsForDay(day){
+  if(!day)return[];
+  const ds=calYear.value+'-'+String(calMonth.value).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+  return calEvents.value.filter(e=>e.date===ds);
+}
+
+// Reminders
+const reminders=ref([]);const showCompleted=ref(false);
+async function loadReminders(){try{const d=await api('/student/reminder/list');reminders.value=d.data||[];}catch(e){}}
+async function completeReminder(rid){
+  try{await api('/student/reminder/'+rid+'/complete',{method:'PUT'});showToast('提醒已完成','tok');loadReminders();}catch(e){}
+}
+
+// Emotion trend
+const emoTrend=ref(null);let emoTrendChart=null;
+async function loadEmoTrend(){
+  try{
+    const d=await api('/emotion/statistics');
+    if(emoTrend.value&&typeof echarts!=='undefined'&&d){
+      if(emoTrendChart)emoTrendChart.dispose();
+      emoTrendChart=echarts.init(emoTrend.value);
+      const data=d.emotion_distribution||d||{};
+      const entries=Object.entries(data);
+      emoTrendChart.setOption({tooltip:{trigger:'axis'},xAxis:{type:'category',data:entries.map(e=>e[0])},yAxis:{type:'value'},series:[{type:'line',data:entries.map(e=>e[1]),smooth:true,areaStyle:{opacity:0.3},color:'#1a73e8'}]});
+    }
+  }catch(e){}
+}
+
+
+    // === 今日工作台 ===
+    const wp=reactive({date:'',weekday:'',todo_list:[],todo_count:0,calendar_events:[],student_summary:{total:0,high_risk:0,medium_risk:0,low_risk:0},pending_reminders:0});
+    const wpRiskStudents=ref([]);
+    const wpCalYear=ref(new Date().getFullYear());
+    const wpCalMonth=ref(new Date().getMonth()+1);
+
+    async function loadWorkplan(){
+        try{
+            const d=await api('/workplan/today');
+            if(d&&d.data){Object.assign(wp,d.data);}
+        }catch(e){console.error('loadWorkplan error:',e);}
+        // 获取高风险+中风险学生
+        try{
+            const d=await api('/student/list?per_page=100');
+            const all=d.data||[];
+            wpRiskStudents.value=all.filter(s=>s.risk_level==='high'||s.risk_level==='medium');
+        }catch(e){}
+    }
+    async function wpCompleteTodo(rid){
+        try{await api('/workplan/complete/'+rid,{method:'PUT'});showToast('已完成','tok');loadWorkplan();}catch(e){showToast('操作失败','ter');}
+    }
+
+    // 日历计算
+    const wpCalRows=computed(()=>{
+        const year=wpCalYear.value,month=wpCalMonth.value;
+        const first=new Date(year,month-1,1);
+        const last=new Date(year,month,0);
+        const days=[];
+        for(let i=0;i<first.getDay();i++)days.push(null);
+        for(let d=1;d<=last.getDate();d++)days.push(d);
+        const today=new Date();
+        const todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+        const rows=[];
+        for(let i=0;i<days.length;i+=7){
+            const row=[];
+            for(let j=0;j<7;j++){
+                const day=days[i+j];
+                if(!day){row.push(null);continue;}
+                const ds=year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+                const events=wp.calendar_events.filter(e=>e.date===ds);
+                row.push({day,isToday:ds===todayStr,events});
+            }
+            rows.push(row);
+        }
+        return rows;
+    });
+    function wpCalPrev(){if(wpCalMonth.value===1){wpCalMonth.value=12;wpCalYear.value--;}else wpCalMonth.value--;loadWorkplan();}
+    function wpCalNext(){if(wpCalMonth.value===12){wpCalMonth.value=1;wpCalYear.value++;}else wpCalMonth.value++;loadWorkplan();}
+    function wpSelectDay(day){
+        const ds = wpCalYear.value + '-' + String(wpCalMonth.value).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+        calDayDetail.date = ds;
+        calDayDetail.show = true;
+        (async()=>{try{const d=await api('/workplan/day/'+ds);calDayDetail.items=d.data||[];}catch(e){calDayDetail.items=[];}})();
+    }
+    // 情绪看板日历点击
+    const calDayDetail = reactive({show:false, date:'', items:[]});
+    async function clickCalDay(day){
+        const ds = calYear.value + '-' + String(calMonth.value).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+        calDayDetail.date = ds;
+        calDayDetail.show = true;
+        try{
+            const d = await api('/workplan/day/' + ds);
+            calDayDetail.items = d.data || [];
+        }catch(e){calDayDetail.items = [];}
+    }
+
+    // ========== 学生端功能 ==========
+    const messageContacts=ref([]);
+    const selectedContact=ref(null);
+    const chatMessages=ref([]);
+    const newMessage=ref('');
+    const studentUnreadCount=ref(0);
+    const appointments=ref([]);
+    const counselors=ref([]);
+    const newAppointment=reactive({counselor_id:'',appointment_time:'',reason:''});
+
+    // WebSocket连接
+    let socket=null;
+    function initSocket(){
+        if(typeof io!=='undefined'){
+            socket=io();
+            socket.on('connect',()=>{console.log('WebSocket connected');});
+            socket.on('new_message',(msg)=>{
+                if(selectedContact.value){
+                    chatMessages.value.push(msg);
+                    nextTick(()=>{
+                        if($refs.studentChatMsg) $refs.studentChatMsg.scrollTop=$refs.studentChatMsg.scrollHeight;
+                    });
+                }
+                loadUnreadCount();
+                loadMessageContacts();
+            });
+        }
+    }
+
+    async function loadStudentData(){
+        try{
+            // 加载辅导员列表
+            const d=await api('/student/list?per_page=100');
+            counselors.value=(d.data||[]).map(s=>({id:s.counselor_id,display_name:s.name,college:s.college}));
+        }catch(e){}
+        loadMessageContacts();
+        loadUnreadCount();
+    }
+
+    async function loadMessageContacts(){
+        try{
+            const d=await api('/messages/contacts');
+            messageContacts.value=d.data||[];
+        }catch(e){}
+    }
+
+    async function selectContact(contact){
+        // 离开之前的房间
+        if(selectedContact.value && socket){
+            socket.emit('leave',{room:'chat_'+selectedContact.value.id});
+        }
+        selectedContact.value=contact;
+        // 加入新房间
+        if(socket){
+            socket.emit('join',{room:'chat_'+contact.id});
+        }
+        try{
+            const d=await api('/messages/'+contact.id);
+            chatMessages.value=(d.data||[]).reverse();
+            await nextTick();
+            if($refs.studentChatMsg) $refs.studentChatMsg.scrollTop=$refs.studentChatMsg.scrollHeight;
+            loadMessageContacts();
+        }catch(e){}
+    }
+
+    async function sendMessage(){
+        if(!newMessage.value.trim()||!selectedContact.value) return;
+        try{
+            const d=await api('/messages/send',{
+                method:'POST',
+                body:JSON.stringify({contact_id:selectedContact.value.id,content:newMessage.value})
+            });
+            // 通过WebSocket广播消息
+            if(socket && d.success){
+                socket.emit('send_message',{
+                    room:'chat_'+selectedContact.value.id,
+                    message:{
+                        id:d.data?.id,
+                        content:newMessage.value,
+                        sender_type:'student',
+                        created_at:new Date().toISOString()
+                    }
+                });
+            }
+            newMessage.value='';
+            selectContact(selectedContact.value);
+        }catch(e){alert('发送失败');}
+    }
+
+    async function loadUnreadCount(){
+        try{
+            const d=await api('/messages/unread');
+            studentUnreadCount.value=d.data?.unread_count||0;
+        }catch(e){}
+    }
+
+    async function loadAppointments(){
+        try{
+            const d=await api('/appointments');
+            appointments.value=d.data||[];
+        }catch(e){}
+    }
+
+    async function createAppointment(){
+        if(!newAppointment.counselor_id||!newAppointment.appointment_time){
+            alert('请选择辅导员和预约时间');
+            return;
+        }
+        try{
+            await api('/appointments/create',{method:'POST',body:JSON.stringify(newAppointment)});
+            alert('预约创建成功');
+            newAppointment.counselor_id='';
+            newAppointment.appointment_time='';
+            newAppointment.reason='';
+            loadAppointments();
+        }catch(e){alert('预约失败');}
+    }
+
+    function formatTime(timeStr){
+        if(!timeStr) return '';
+        const d=new Date(timeStr);
+        return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+    }
+
+    // ========== 视频通话功能 ==========
+    const localVideo=ref(null);
+    const remoteVideo=ref(null);
+    const isInCall=ref(false);
+    const isVideoEnabled=ref(true);
+    const isAudioEnabled=ref(true);
+    const videoCallStatus=ref('等待连接...');
+    let localStream=null;
+    let peerConnection=null;
+
+    async function startVideoCall(){
+        try{
+            localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+            if(localVideo.value) localVideo.value.srcObject=localStream;
+            isInCall.value=true;
+            isVideoEnabled.value=true;
+            isAudioEnabled.value=true;
+            videoCallStatus='正在连接...';
+
+            // 这里应该通过WebSocket与辅导员建立WebRTC连接
+            // 简化示例：显示本地视频
+            videoCallStatus='等待辅导员加入...';
+
+            // 通知辅导员有视频呼叫
+            if(socket){
+                socket.emit('video_call_request',{
+                    student_id:currentUser.student_id,
+                    student_name:currentUser.name
+                });
+            }
+        }catch(err){
+            console.error('获取媒体设备失败:',err);
+            alert('无法访问摄像头或麦克风，请检查权限设置');
+        }
+    }
+
+    function endVideoCall(){
+        if(localStream){
+            localStream.getTracks().forEach(track=>track.stop());
+            localStream=null;
+        }
+        if(peerConnection){
+            peerConnection.close();
+            peerConnection=null;
+        }
+        if(localVideo.value) localVideo.value.srcObject=null;
+        if(remoteVideo.value) remoteVideo.value.srcObject=null;
+        isInCall.value=false;
+        videoCallStatus='等待连接...';
+    }
+
+    function toggleVideo(){
+        if(localStream){
+            const videoTrack=localStream.getVideoTracks()[0];
+            if(videoTrack){
+                videoTrack.enabled=!videoTrack.enabled;
+                isVideoEnabled.value=videoTrack.enabled;
+            }
+        }
+    }
+
+    function toggleAudio(){
+        if(localStream){
+            const audioTrack=localStream.getAudioTracks()[0];
+            if(audioTrack){
+                audioTrack.enabled=!audioTrack.enabled;
+                isAudioEnabled.value=audioTrack.enabled;
+            }
+        }
+    }
+
+    return {isLoggedIn,loginForm,loginLoading,currentUser,roleLabel,handleLogin,handleLogout,isDarkMode,toggleTheme,
+    loginType,showStudentRegister,studentLoginForm,studentRegisterForm,handleStudentLogin,handleStudentRegister,
+    page,dash,recentAlerts,loadDash,
+
+    chatScene,chatHistory,chatInput,chatLoading,chatMsg,sendChat,clearImage,previewUrl,selectedFile,uploadingImage,uploadAndRecognize,handlePaste,
+
+    emoLogs,emoResult,loadEmotionLogs,uploadAudio,loadKbStats,
+
+    alerts,loadAlerts,ackAlert,kbStats,uploadDoc,
+
+    students,studentSearch,showAddStudent,newStudent,selectedStudent,studentProfiles,loadStudents,addStudent,viewStudent,updateStudentNotes,wp,wpRiskStudents,wpCalYear,wpCalMonth,wpCalRows,wpCalPrev,wpCalNext,wpSelectDay,loadWorkplan,wpCompleteTodo,
+    calYear,calMonth,calEvents,weekdays,loadCalendar,prevMonth,nextMonth,getCalDays,getEventsForDay,reminders,showCompleted,loadReminders,completeReminder,emoTrend,loadEmoTrend,calDayDetail,clickCalDay,emoColor,riskBg,riskLbl,cPie,cTrend,cRisk,renderCharts,renderMd,chatInputPlaceholder,
+    // 学生端
+    messageContacts,selectedContact,chatMessages,newMessage,studentUnreadCount,appointments,counselors,newAppointment,
+    loadMessageContacts,selectContact,sendMessage,loadAppointments,createAppointment,formatTime,
+    // 视频通话
+    localVideo,remoteVideo,isInCall,isVideoEnabled,isAudioEnabled,videoCallStatus,
+    startVideoCall,endVideoCall,toggleVideo,toggleAudio};
+    }
+}).mount('#app');
+
+} catch(e) { document.getElementById('app').innerHTML = '<div style="padding:40px;color:red;"><h2>JS Error</h2><pre>' + e.message + '</pre></div>'; }
+
+})();
+
+</script>
+
+</body></html>
+
+
+
