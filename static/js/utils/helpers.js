@@ -2,9 +2,12 @@
  * 聆心 — 通用工具函数
  */
 window.Helpers = {
-  // 情绪颜色映射
+  // 情绪颜色映射（单一数据源：优先取 EmotionFusionEngine，前端统一颜色）
   emoColor: function(e) {
-    var m = { 正常:'#10b981',高兴:'#3b82f6',低落:'#94a3b8',焦虑:'#f59e0b',烦躁:'#ef4444',压抑:'#8b5cf6',愤怒:'#e74c3c',恐惧:'#8e44ad',惊讶:'#f39c12',厌恶:'#7f8c8d',悲伤:'#1e293b',紧张:'#e67e22',平静:'#3b82f6' };
+    if (window.EmotionFusionEngine && window.EmotionFusionEngine.emotionColor) {
+      return window.EmotionFusionEngine.emotionColor(e);
+    }
+    var m = { 高兴:'#10b981',正常:'#94a3b8',平静:'#3b82f6',焦虑:'#f59e0b',恐惧:'#ef4444',愤怒:'#ef4444',悲伤:'#6366f1',压抑:'#8b5cf6',紧张:'#e67e22',惊讶:'#f39c12',烦躁:'#f97316',低落:'#94a3b8',厌恶:'#7f8c8d' };
     return m[e] || '#94a3b8';
   },
   // 风险背景色

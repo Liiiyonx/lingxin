@@ -328,6 +328,7 @@
                                     <div class="flex items-center gap-3"><div class="avatar">{{ teacherSelected.name[0] }}</div><span class="font-bold text-base">{{ teacherSelected.name }}<span v-if="teacherSelected.student_id" class="text-sm text-muted font-normal"> #{{ teacherSelected.student_id }}</span></span></div>
                                     <div class="flex gap-2 items-center">
                                         <button @click="analyzeCounselorGuidance()" :disabled="guidanceLoading" class="btn btn-sm" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:white">{{ guidanceLoading?'分析中...':'🧠 AI辅导分析' }}</button>
+                                        <button @click="generateTalkReport()" :disabled="talkReportLoading" class="btn btn-outline btn-sm">{{ talkReportLoading?'生成中...':'📝 谈心记录' }}</button>
                                         <button @click="openTeacherVideo" v-if="!teacherInCall" class="btn btn-outline btn-sm">📹 视频</button>
                                         <button v-else @click="endTeacherVideo" class="btn btn-danger btn-xs">挂断</button>
                                     </div>
@@ -391,6 +392,11 @@
                                         <div class="p-3 rounded-md" style="background:var(--bg-tertiary);line-height:1.7">{{ realtimeCallSummary.summary }}</div>
                                         <div class="text-xs text-muted">&#22797;&#26597;&#35268;&#21017;&#65306;{{ realtimeCallSummary.review_rule_text }}</div>
                                     </div>
+                                </div></div>
+                                <div v-if="talkReport" class="dialog-mask" @click.self="talkReport=null"><div class="dialog-box" style="max-width:640px">
+                                    <div class="flex justify-between items-center mb-4"><h3 class="m-0">📝 谈心记录报告</h3><button @click="talkReport=null" class="btn btn-ghost btn-sm">关闭</button></div>
+                                    <div class="text-sm leading-relaxed" style="max-height:60vh;overflow-y:auto" v-html="Helpers.renderMd(talkReport.summary)"></div>
+                                    <div class="mt-3 text-xs text-muted">✅ 已归档到学生档案（辅导记录）</div>
                                 </div></div>
                                 <div v-if="guidanceResult" class="mx-4 my-2 p-4 bg-brand-50 rounded-lg border border-brand-200 text-sm" style="max-height:56vh;overflow-y:auto">
                                     <div class="flex justify-between items-center mb-3"><strong class="text-brand text-sm">🧠 AI辅导分析 <span class="text-muted text-xs font-normal">点击话术直接填入输入框</span></strong><button @click="guidanceResult=null" class="btn btn-ghost btn-xs" style="font-size:16px">✕</button></div>
@@ -555,7 +561,7 @@
                             <div v-if="!messageContacts.length" class="empty-state p-8">暂无消息</div></div>
                         <div class="chat-main">
                             <div v-if="selectedContact" class="flex items-center justify-between p-3 px-4 border-b"><span class="font-bold text-base">{{ selectedContact.name }}老师</span>
-                                <button @click="startVideoCall" v-if="!isInCall" class="btn btn-sm" style="background:var(--brand-gradient);color:white">📹 视频</button>
+                                <div class="flex gap-2 items-center"><button @click="crisisReport()" class="btn btn-sm btn-danger">🆘 紧急求助</button><button @click="startVideoCall" v-if="!isInCall" class="btn btn-sm" style="background:var(--brand-gradient);color:white">📹 视频</button></div>
                                 <template v-else><div class="flex gap-2 items-center"><span class="emotion-live-indicator active"></span><span class="text-xs text-success">通话中</span><button @click="toggleVideo" class="btn btn-xs" :class="isVideoEnabled?'btn-outline':'btn-danger'">📷</button><button @click="toggleAudio" class="btn btn-xs" :class="isAudioEnabled?'btn-outline':'btn-danger'">🎤</button><button @click="endVideoCall" class="btn btn-danger btn-xs">挂断</button></div></template></div>
                             <!-- 微信式视频：大画面(对方) + 右下小窗(自己) -->
                             <div v-if="isInCall" class="relative bg-dark" style="height:400px;border-radius:8px;overflow:hidden">
@@ -596,6 +602,12 @@
                     <!-- 测评结果 -->
                     <div v-else class="fade-in"><div class="card text-center mb-4"><div style="font-size:48px;margin-bottom:12px">{{ assessmentResult.suggestions&&assessmentResult.suggestions.length>1?'🟡':'🟢' }}</div><h3 class="mb-4">测评完成</h3>
                         <div class="grid-3 gap-3 mb-4"><div class="p-4 bg-tertiary rounded-lg"><div class="text-xs text-muted">抑郁 PHQ-9</div><div class="text-2xl font-bold text-brand">{{ assessmentResult.scores.phq9 }}</div><div class="text-xs" :style="{color:assessmentResult.levels.phq9==='正常'?'var(--success)':'var(--danger)'}">{{ assessmentResult.levels.phq9 }}</div></div><div class="p-4 bg-tertiary rounded-lg"><div class="text-xs text-muted">焦虑 GAD-7</div><div class="text-2xl font-bold text-brand">{{ assessmentResult.scores.gad7 }}</div><div class="text-xs" :style="{color:assessmentResult.levels.gad7==='正常'?'var(--success)':'var(--warning)'}">{{ assessmentResult.levels.gad7 }}</div></div><div class="p-4 bg-tertiary rounded-lg"><div class="text-xs text-muted">失眠 ISI</div><div class="text-2xl font-bold text-brand">{{ assessmentResult.scores.isi }}</div><div class="text-xs" :style="{color:assessmentResult.levels.isi==='正常'?'var(--success)':'var(--warning)'}">{{ assessmentResult.levels.isi }}</div></div></div>
+                        <div v-if="assessmentResult.crisis" class="text-left p-4 rounded-md mb-3" style="background:#fee2e2;border-left:3px solid #ef4444">
+                            <div class="font-bold mb-2" style="color:#dc2626">🚨 安全确认与危机干预</div>
+                            <p class="text-sm mb-2" style="color:#7f1d1d">你的安全对我们最重要。如果你此刻有伤害自己的念头，请不要独自承受——立即联系信任的人，或拨打以下 24 小时心理援助热线。</p>
+                            <div class="text-sm font-semibold mb-2" style="color:#7f1d1d">📞 {{ assessmentResult.crisis_hotline }}</div>
+                            <button class="btn btn-danger btn-sm" @click="crisisReport()">立即联系辅导员/心理中心</button>
+                        </div>
                         <div v-if="assessmentResult.suggestions&&assessmentResult.suggestions.length" class="text-left p-4 bg-warning-bg rounded-md border-l-warning"><div class="font-semibold mb-2">💡 建议</div><div v-for="(s,i) in assessmentResult.suggestions" :key="i" class="text-sm mb-1">· {{ s }}</div></div>
                         <button @click="resetAssessment" class="btn btn-sm mt-4" style="background:var(--brand-gradient);color:white">重新测评</button></div>
                         <div class="card" v-if="assessmentHistory.length>1"><div class="card-header"><span class="card-title">历史测评记录</span></div><div v-for="(h,i) in assessmentHistory" :key="i" class="flex justify-between items-center py-2 border-b border-light text-sm"><span>{{ h.created_at }}</span><span>PHQ-9: <b>{{ h.phq9_score }}</b> GAD-7: <b>{{ h.gad7_score }}</b> ISI: <b>{{ h.isi_score }}</b></span></div></div></div>

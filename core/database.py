@@ -76,6 +76,7 @@ class ConversationRecord(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     counselor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="SET NULL"), nullable=True, index=True, comment="学生主键外键")
     student_name = Column(String(100), nullable=False)
     student_class = Column(String(100), nullable=False, comment="学生班级")
     topic = Column(String(200), nullable=False, comment="咨询主题")
@@ -103,6 +104,7 @@ class EmotionLog(Base):
     __tablename__ = "emotion_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="SET NULL"), nullable=True, index=True, comment="学生主键外键")
     student_name = Column(String(100), nullable=False, index=True)
     student_class = Column(String(100), nullable=False)
     audio_path = Column(String(500), nullable=True, comment="音频文件路径")
@@ -126,6 +128,7 @@ class AlertLog(Base):
     __tablename__ = "alert_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="SET NULL"), nullable=True, index=True, comment="学生主键外键")
     student_name = Column(String(100), nullable=False, index=True)
     student_class = Column(String(100), nullable=False)
     risk_level = Column(String(20), nullable=False, comment="high/critical")
@@ -417,6 +420,50 @@ class DatabaseManager:
         Base.metadata.create_all(self.engine)
         print("[OK] 数据库表创建完成")
 
+    def migrate_student_id_links(self):
+        """为 emotion_logs / alert_logs / conversation_records 补充并回填 student_id 外键（幂等）。
+
+        SQLite 的 create_all 不会给已有表加列，需手动 ALTER + 按姓名回填。
+        回填采用内存映射（姓名唯一 → 直接匹配；同名 → 优先同班），避免 SQLite
+        相关子查询 ORDER BY 的兼容性问题。新数据写入时自动解析，此方法仅迁移历史数据。
+        """
+        from sqlalchemy import text
+        with self.engine.connect() as conn:
+            for table in ("emotion_logs", "alert_logs", "conversation_records"):
+                cols = [r[1] for r in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()]
+                if "student_id" not in cols:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN student_id INTEGER"))
+            conn.commit()
+
+            # 构建 name -> [(id, class_name)] 映射
+            name_map = {}
+            for sid, sname, sclass in conn.execute(text("SELECT id, name, class_name FROM students")).fetchall():
+                name_map.setdefault(sname, []).append((sid, sclass or ""))
+
+            def resolve(row_name, row_class):
+                matches = name_map.get(row_name)
+                if not matches:
+                    return None
+                if len(matches) == 1:
+                    return matches[0][0]
+                for sid, sclass in matches:  # 同名 → 优先同班
+                    if sclass == (row_class or ""):
+                        return sid
+                return None  # 多同名且不同班，无法唯一确定
+
+            for table in ("emotion_logs", "alert_logs", "conversation_records"):
+                rows = conn.execute(text(
+                    f"SELECT id, student_name, student_class FROM {table} WHERE student_id IS NULL"
+                )).fetchall()
+                for rid, rname, rclass in rows:
+                    sid = resolve(rname, rclass)
+                    if sid:
+                        conn.execute(text(
+                            f"UPDATE {table} SET student_id = :sid WHERE id = :rid"
+                        ), {"sid": sid, "rid": rid})
+                conn.commit()
+        print("[OK] student_id 外键迁移与回填完成")
+
     def drop_all(self):
         """删除所有表（危险操作）"""
         Base.metadata.drop_all(self.engine)
@@ -452,6 +499,21 @@ class DatabaseManager:
             raise
         finally:
             session.close()
+
+    @staticmethod
+    def _resolve_student_id(session, student_name, student_class=None):
+        """根据姓名（优先同班）解析学生主键；无法唯一确定时返回 None。"""
+        if not student_name:
+            return None
+        q = session.query(Student.id).filter(Student.name == student_name)
+        if student_class:
+            exact = q.filter(Student.class_name == student_class).first()
+            if exact:
+                return exact[0]
+        rows = q.limit(2).all()
+        if len(rows) == 1:
+            return rows[0][0]
+        return None
 
     # ── User CRUD ─────────────────────────────────────────
 
@@ -538,20 +600,24 @@ class DatabaseManager:
 
     def create_conversation(self, counselor_id, student_name, student_class,
                             topic, content, structured_content=None,
-                            emotion_tags=None, risk_level="low", status="draft"):
-        """创建咨询记录"""
-        record = ConversationRecord(
-            counselor_id=counselor_id,
-            student_name=student_name,
-            student_class=student_class,
-            topic=topic,
-            content=content,
-            structured_content=structured_content,
-            emotion_tags=emotion_tags,
-            risk_level=risk_level,
-            status=status,
-        )
+                            emotion_tags=None, risk_level="low", status="draft",
+                            student_id=None):
+        """创建咨询记录（未显式指定时自动按姓名解析学生主键）"""
         with self.get_session() as session:
+            if student_id is None:
+                student_id = self._resolve_student_id(session, student_name, student_class)
+            record = ConversationRecord(
+                counselor_id=counselor_id,
+                student_id=student_id,
+                student_name=student_name,
+                student_class=student_class,
+                topic=topic,
+                content=content,
+                structured_content=structured_content,
+                emotion_tags=emotion_tags,
+                risk_level=risk_level,
+                status=status,
+            )
             session.add(record)
             session.flush()
             return record.id
@@ -619,20 +685,24 @@ class DatabaseManager:
 
     def create_emotion_log(self, student_name, student_class, emotion,
                            emotion_id=None, confidence=None, intensity=None,
-                           audio_path=None, risk_level="low", analyzed_by=None):
-        """创建情绪日志"""
-        log = EmotionLog(
-            student_name=student_name,
-            student_class=student_class,
-            emotion=emotion,
-            emotion_id=emotion_id,
-            confidence=confidence,
-            intensity=intensity,
-            audio_path=audio_path,
-            risk_level=risk_level,
-            analyzed_by=analyzed_by,
-        )
+                           audio_path=None, risk_level="low", analyzed_by=None,
+                           student_id=None):
+        """创建情绪日志（未显式指定时自动按姓名解析学生主键）"""
         with self.get_session() as session:
+            if student_id is None:
+                student_id = self._resolve_student_id(session, student_name, student_class)
+            log = EmotionLog(
+                student_id=student_id,
+                student_name=student_name,
+                student_class=student_class,
+                emotion=emotion,
+                emotion_id=emotion_id,
+                confidence=confidence,
+                intensity=intensity,
+                audio_path=audio_path,
+                risk_level=risk_level,
+                analyzed_by=analyzed_by,
+            )
             session.add(log)
             session.flush()
             return log.id
@@ -741,18 +811,21 @@ class DatabaseManager:
 
     def create_alert(self, student_name, student_class, risk_level,
                      emotion_type=None, intensity=None, description=None,
-                     assigned_to=None):
-        """创建预警"""
-        alert = AlertLog(
-            student_name=student_name,
-            student_class=student_class,
-            risk_level=risk_level,
-            emotion_type=emotion_type,
-            intensity=intensity,
-            description=description,
-            assigned_to=assigned_to,
-        )
+                     assigned_to=None, student_id=None):
+        """创建预警（未显式指定时自动按姓名解析学生主键）"""
         with self.get_session() as session:
+            if student_id is None:
+                student_id = self._resolve_student_id(session, student_name, student_class)
+            alert = AlertLog(
+                student_id=student_id,
+                student_name=student_name,
+                student_class=student_class,
+                risk_level=risk_level,
+                emotion_type=emotion_type,
+                intensity=intensity,
+                description=description,
+                assigned_to=assigned_to,
+            )
             session.add(alert)
             session.flush()
             return alert.id

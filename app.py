@@ -10,7 +10,7 @@ from flask import Flask, send_from_directory, jsonify, send_file, request, Respo
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from config.config import ApplicationConfig, load_config
-from api.routes import api
+from api.routes import api, set_socketio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -123,11 +123,13 @@ def create_app():
         logger.info(f"视频通话结束: room={room}")
 
     app.socketio = socketio
+    set_socketio(socketio)
 
     try:
         from core.database import DatabaseManager
         db_manager = DatabaseManager()
         db_manager.init_db()
+        db_manager.migrate_student_id_links()
         logger.info('Database initialized')
     except Exception as e:
         logger.warning(f"Database init skipped: {e}")

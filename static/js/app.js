@@ -644,6 +644,10 @@
         socket = io({ transports: ['polling', 'websocket'], timeout: 5000, reconnectionAttempts: 3 });
         socket.on('connect', function() { /* connected */ });
         socket.on('connect_error', function() { /* silent retry */ });
+        // 视频通话情绪总结落库后，实时刷新情绪网络图
+        socket.on('emotion_graph_update', function(data) {
+          loadEmotionNetwork();
+        });
         socket.on('new_message', function(msg) {
           if (page.value === 'teacherChat' && teacherSelected.value) {
             teacherChatMsgs.value.push(msg);
@@ -745,6 +749,28 @@
           var el = document.querySelector('.chat-compose-input');
           if (el) el.focus();
         });
+      }
+
+      const talkReport = ref(null);
+      const talkReportLoading = ref(false);
+      async function generateTalkReport() {
+        if (!teacherSelected.value || !teacherChatMsgs.value.length) { Toast.error('请先选择学生并有对话内容'); return; }
+        talkReportLoading.value = true;
+        try {
+          var d = await API.post('/conversation/generate-report', {
+            student_id: teacherSelected.value.id,
+            student_name: teacherSelected.value.name,
+            messages: teacherChatMsgs.value.slice(-30),
+            topic: '日常谈心'
+          });
+          if (d && d.success && d.data) {
+            talkReport.value = d.data.report || null;
+            Toast.success('谈心记录已生成并归档到学生档案');
+          } else {
+            Toast.error(d.message || '生成失败');
+          }
+        } catch (e) { Toast.error('生成失败'); }
+        talkReportLoading.value = false;
       }
 
       async function loadMessageContacts() {
@@ -1819,6 +1845,20 @@
 
       function resetAssessment() { assessmentResult.value = null; initAssessment(); }
 
+      async function crisisReport() {
+        if (!confirm('确认要上报心理危机吗？辅导员与心理中心将尽快联系你。\n\n如有紧急危险，请立即拨打 120 / 110 或心理援助热线 400-161-9995。')) return;
+        try {
+          var d = await API.post('/crisis/report', { reason: '学生主动求助' });
+          if (d && d.success) {
+            Toast.success(d.message || '危机已上报');
+            if (d.data && d.data.hotline) Toast.info('📞 ' + d.data.hotline);
+            if (currentUser.role === 'student') { page.value = 'studentChat'; loadMessageContacts(); }
+          } else {
+            Toast.error(d.message || '上报失败');
+          }
+        } catch (e) { Toast.error('上报失败，请稍后重试'); }
+      }
+
       async function loadAssessmentHistory() {
         try { var d = await API.get('/assessment/history'); assessmentHistory.value = d.data || []; }
         catch (e) { /* silent */ }
@@ -2012,7 +2052,7 @@
         messageContacts, teacherSelected, teacherChatMsgs, teacherNewMsg, teacherUnreadCount, teacherMsgRef,
         studentSearchQuery, studentSearchResults, searchStudentsHandler, inviteStudent,
         selectTeacherContact, sendTeacherMsg, guidanceResult, guidanceLoading, analyzeCounselorGuidance,
-        fillTeacherMsg, guidanceRiskTagStyle,
+        fillTeacherMsg, guidanceRiskTagStyle, talkReport, talkReportLoading, generateTalkReport,
         selectedContact, chatMessages, newMessage, studentUnreadCount, studentMsgRef,
         loadMessageContacts, selectContactHandler, sendStudentMsg, loadUnreadCount,
         insertEmoji, insertTeacherEmoji, teacherShowEmoji, showEmoji, emojiList,
@@ -2036,7 +2076,7 @@
         assessmentStep, assessmentOptions, assessmentProgress, assessmentStepLabel,
         phq9Questions, gad7Questions, isiQuestions, currentStepQuestions, currentStepStart,
         assessmentAnswers, assessmentSubmitting, assessmentResult, assessmentHistory,
-        initAssessment, submitAssessment, resetAssessment, loadAssessmentHistory,
+        initAssessment, submitAssessment, resetAssessment, loadAssessmentHistory, crisisReport,
         canProceedToNext, goToNextStep, goToPrevStep,
         // 学生Widget
         waterCount, waterProgress, addWater, resetWater,

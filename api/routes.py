@@ -56,6 +56,31 @@ def _check_login_rate_limit(ip):
     _login_attempts[ip].append(now)
     return True
 
+
+def _audit_login_failure(username, ip, kind="staff"):
+    """记录登录失败审计日志（不抛异常，避免影响登录主流程）"""
+    try:
+        db.log_action(
+            None,
+            "登录失败" if kind == "staff" else "学生登录失败",
+            target_type="auth",
+            details={"username": username, "ip": ip},
+            ip_address=ip,
+        )
+    except Exception as exc:
+        logger.warning("登录失败审计记录失败: %s", exc)
+
+
+def _validate_password_strength(password, student_id=""):
+    """密码强度校验：至少6位、不能纯数字、不能与学号相同。返回 (是否通过, 提示)"""
+    if len(password) < 6:
+        return False, "密码长度至少6位"
+    if password.isdigit():
+        return False, "密码不能为纯数字，请包含字母"
+    if student_id and password == student_id:
+        return False, "密码不能与学号相同"
+    return True, ""
+
 # Module-level singletons (lazy-initialised after app starts)
 db = None
 auth = None
@@ -65,6 +90,26 @@ conversation_engine = None
 prompt_manager = None
 knowledge_base = None
 rag_generator = None
+_socketio = None
+
+
+def set_socketio(sio):
+    """由 app.py 在创建 SocketIO 后注入，供路由实时推送事件。"""
+    global _socketio
+    _socketio = sio
+
+
+def emit_network_graph_update(student_name=None):
+    """视频通话情绪总结落库后，广播网络图刷新事件（跨用户实时联动）。"""
+    if _socketio is None:
+        return
+    try:
+        _socketio.emit("emotion_graph_update", {
+            "student_name": student_name or "",
+            "ts": datetime.now().isoformat(),
+        }, broadcast=True)
+    except Exception as exc:
+        logger.warning("网络图刷新事件推送失败: %s", exc)
 
 
 def init_services(app):
@@ -283,6 +328,7 @@ def login():
         return jsonify({"success": False, "message": "登录失败，请稍后重试"}), 500
 
     if user is None:
+        _audit_login_failure(username, ip, kind="staff")
         return jsonify({"success": False, "message": "用户名或密码错误"}), 401
 
     token = auth.generate_token(user)
@@ -347,6 +393,7 @@ def student_login():
         return jsonify({"success": False, "message": "登录失败，请稍后重试"}), 500
 
     if student is None:
+        _audit_login_failure(student_id, ip, kind="student")
         return jsonify({"success": False, "message": "学号或密码错误"}), 401
 
     token = auth.generate_student_token(student)
@@ -384,6 +431,10 @@ def student_register():
 
     if len(password) < 6:
         return jsonify({"success": False, "message": "密码长度至少6位"}), 400
+
+    ok, msg = _validate_password_strength(password, student_id)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
 
     # 检查学生是否存在
     student = db.get_student_by_student_id(student_id)
@@ -903,6 +954,116 @@ def counselor_guidance():
     except Exception as e:
         logger.error("辅导分析失败: %s", e)
         return jsonify({"success": True, "data": _local_guidance(conversation_text, student_name)}), 200
+
+
+def _generate_report_local(conversation_text, student_name, topic):
+    """本地兜底：基于情绪关键词生成结构化谈心记录（无需 API）。"""
+    emo_result = _local_text_emotion(conversation_text)
+    emo = emo_result.get("emotion", "正常")
+    risk = emo_result.get("risk", "low")
+    student_lines = [l for l in conversation_text.split("\n") if l.startswith("学生：")]
+    points = student_lines[-5:] or ["（暂无学生发言记录）"]
+    summary = (
+        f"# 谈心记录\n\n"
+        f"- 学生：{student_name}\n"
+        f"- 主题：{topic}\n"
+        f"- 时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+        f"## 一、情绪评估\n{student_name} 当前情绪偏向「{emo}」，综合风险等级为「{risk}」。\n\n"
+        f"## 二、学生反馈要点\n" + "\n".join(f"- {p.replace('学生：', '')}" for p in points) + "\n\n"
+        f"## 三、沟通策略\n- 先共情稳定情绪，再开放式提问澄清，最后给予资源支持。\n\n"
+        f"## 四、后续跟进\n- 根据风险等级安排复查（高风险 3 日内、中风险 7 日内）。\n"
+    )
+    return {
+        "summary": summary,
+        "emotion_tags": {"primary": emo, "risk": risk},
+        "risk_level": "high" if risk == "high" else "medium" if risk == "medium" else "low",
+    }
+
+
+def _generate_report(conversation_text, student_name, topic):
+    """生成结构化谈心记录报告：优先 LLM，失败/无 Key 时本地兜底。"""
+    api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+    if not api_key:
+        return _generate_report_local(conversation_text, student_name, topic)
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key, base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
+        prompt = (
+            f"你是高校辅导员，请把以下与学生「{student_name}」的谈心对话整理成一份结构化谈心记录（Markdown 格式）。\n\n"
+            f"对话主题：{topic}\n\n"
+            f"对话记录：\n{conversation_text}\n\n"
+            f"请按以下结构输出：\n"
+            f"# 谈心记录\n"
+            f"- 学生 / 主题 / 时间\n"
+            f"## 一、情绪评估\n## 二、学生反馈要点\n## 三、沟通策略\n## 四、后续跟进\n"
+            f"要求：客观、简洁、可归档，符合心理辅导伦理，避免评判性语言。"
+        )
+        resp = client.chat.completions.create(
+            model="qwen-plus",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=900, temperature=0.4,
+        )
+        summary = resp.choices[0].message.content.strip() or _generate_report_local(conversation_text, student_name, topic)["summary"]
+        emo_result = _local_text_emotion(conversation_text)
+        return {
+            "summary": summary,
+            "emotion_tags": {"primary": emo_result.get("emotion", "正常"), "risk": emo_result.get("risk", "low")},
+            "risk_level": "high" if emo_result.get("risk") == "high" else "medium" if emo_result.get("risk") == "medium" else "low",
+        }
+    except Exception as exc:
+        logger.warning("报告生成调用 LLM 失败，使用本地兜底: %s", exc)
+        return _generate_report_local(conversation_text, student_name, topic)
+
+
+@api.route("/conversation/generate-report", methods=["POST"])
+@auth_required
+@log_action("生成谈心记录报告")
+def generate_conversation_report():
+    """一键生成结构化谈心记录报告，并沉淀到学生档案（StudentProfile）。"""
+    data = request.get_json(silent=True) or {}
+    student_id = data.get("student_id")  # Student.id
+    messages = data.get("messages") or []
+    topic = (data.get("topic") or "").strip() or "日常谈心"
+    student_name = data.get("student_name") or "学生"
+
+    if not student_id:
+        return jsonify({"success": False, "message": "缺少学生信息"}), 400
+
+    conversation_text = "\n".join([
+        ("学生" if m.get("sender_type") == "student" else "老师") + "：" + m.get("content", "")
+        for m in messages[-30:]
+    ])
+    if not conversation_text.strip():
+        return jsonify({"success": False, "message": "暂无对话内容，无法生成记录"}), 400
+
+    report = _generate_report(conversation_text, student_name, topic)
+
+    # 保存到学生档案
+    profile_id = None
+    try:
+        counselor_id = g.user_id if getattr(g, "user_type", "staff") != "student" else None
+        profile_id = db.create_student_profile(
+            student_id=student_id,
+            counselor_id=counselor_id,
+            record_type="talk_report",
+            summary=report["summary"],
+            structured_content=json.dumps(report, ensure_ascii=False),
+            emotion_tags=report.get("emotion_tags"),
+            risk_level=report.get("risk_level", "low"),
+            counselor_impression="AI 辅助生成，建议辅导员复核补充。",
+        )
+    except Exception as exc:
+        logger.error("谈心记录保存失败: %s", exc)
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "profile_id": profile_id,
+            "report": report,
+            "student_name": student_name,
+            "topic": topic,
+        },
+    }), 200
 
 
 # ===================================================================
@@ -2156,6 +2317,9 @@ def create_realtime_emotion_summary():
                 assigned_to=analyzer_id,
             )
 
+        # \u901a\u8bdd\u7ed3\u675f\u3001\u5b66\u751f\u60c5\u7eea\u72b6\u6001\u5df2\u843d\u5e93 \u2192 \u5e7f\u64ad\u7f51\u7edc\u56fe\u5237\u65b0\u4e8b\u4ef6\uff08\u8de8\u7aef\u5b9e\u65f6\u8054\u52a8\uff09
+        emit_network_graph_update(student_name=student_name)
+
         return jsonify({
             "success": True,
             "message": "\u89c6\u9891\u901a\u8bdd\u60c5\u7eea\u603b\u7ed3\u5df2\u751f\u6210",
@@ -3148,24 +3312,92 @@ def submit_assessment():
         "scores": {"phq9": phq9, "gad7": gad7, "isi": isi, "item9": item9},
         "levels": {"phq9": labels[p_level], "gad7": labels[g_level], "isi": labels[i_level]},
         "suggestions": suggestions,
+        "crisis": item9 >= 2,
+        "crisis_hotline": "全国心理援助热线 400-161-9995 · 北京危机干预 010-82951332",
     }
 
-    # 如果有高危自伤信号，通知
+    # 如果有高危自伤信号，触发危机干预（生成高危预警 + 审计 + 关联学生）
     if item9 >= 2:
         try:
+            stu = db.get_student_by_id(student_pk) if student_pk else None
             db.create_alert(
-                student_name=getattr(g, "username", "学生"),
-                student_class="",
+                student_name=stu.get("name") if stu else getattr(g, "username", "学生"),
+                student_class=stu.get("class_name") if stu else "",
                 risk_level="high",
-                emotion_type="抑郁",
-                intensity=item9 * 3,
-                description=f"PHQ-9第9题得分{item9}，存在自伤意念风险",
-                assigned_to=None,
+                emotion_type="危机",
+                intensity=10,
+                description=f"PHQ-9第9题得分{item9}，存在自伤意念风险，需立即启动危机干预",
+                assigned_to=stu.get("counselor_id") if stu else None,
+                student_id=student_pk,
             )
-        except Exception:
-            pass
+            db.log_action(student_pk, "危机预警", target_type="assessment", details={"item9": item9, "phq9": phq9})
+        except Exception as exc:
+            logger.warning("危机预警创建失败: %s", exc)
 
     return jsonify({"success": True, "data": result}), 200
+
+
+@api.route("/crisis/report", methods=["POST"])
+@auth_required
+@log_action("危机上报")
+def crisis_report():
+    """危机上报：学生/辅导员主动上报心理危机，生成高危预警并关联学生、广播通知。"""
+    data = request.get_json(silent=True) or {}
+    reason = (data.get("reason") or "").strip()
+    is_student = getattr(g, "user_type", "staff") == "student"
+
+    student_pk = g.student_id if is_student else None
+    student_name = getattr(g, "username", "学生")
+    student_class = ""
+    student_id_no = ""
+    counselor_id = None
+
+    # 辅导员/管理员上报时，通过学号解析学生
+    if not is_student:
+        sid_str = str(data.get("student_id") or "").strip()
+        if sid_str.isdigit():
+            stu = db.get_student_by_student_id(sid_str)
+            if stu:
+                student_pk = stu.get("id")
+
+    if student_pk:
+        stu = db.get_student_by_id(student_pk)
+        if stu:
+            student_name = stu.get("name") or student_name
+            student_class = stu.get("class_name") or ""
+            student_id_no = stu.get("student_id") or ""
+            counselor_id = stu.get("counselor_id")
+
+    try:
+        alert_id = db.create_alert(
+            student_name=student_name,
+            student_class=student_class,
+            risk_level="high",
+            emotion_type="危机",
+            intensity=10,
+            description=f"危机上报：{reason or '学生主动求助'}",
+            assigned_to=counselor_id,
+            student_id=student_pk,
+        )
+        db.log_action(
+            g.user_id if not is_student else student_pk,
+            "危机上报",
+            target_type="crisis",
+            target_id=alert_id,
+            details={"reason": reason, "student_name": student_name, "student_id": student_id_no},
+        )
+    except Exception as exc:
+        logger.error("危机上报失败: %s", exc)
+        return jsonify({"success": False, "message": "危机上报失败，请稍后重试"}), 500
+
+    return jsonify({
+        "success": True,
+        "message": "已上报，辅导员与心理中心将尽快联系你，请保持安全",
+        "data": {
+            "alert_id": alert_id,
+            "hotline": "全国心理援助热线 400-161-9995 · 北京危机干预 010-82951332",
+        },
+    }), 200
 
 
 @api.route("/assessment/history", methods=["GET"])
