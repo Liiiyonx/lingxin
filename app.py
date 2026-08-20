@@ -72,14 +72,6 @@ def create_app():
             leave_room(room)
             logger.info(f'User left room: {room}')
 
-    @socketio.on('send_message')
-    def handle_message(data):
-        room = data.get('room')
-        message = data.get('message')
-        if room and message:
-            emit('new_message', message, room=room)
-            logger.info(f'Message sent to room: {room}')
-
     # --- WebRTC 视频通话信令 ---
     @socketio.on('video_call_request')
     def handle_video_call_request(data):
@@ -130,6 +122,7 @@ def create_app():
         db_manager = DatabaseManager()
         db_manager.init_db()
         db_manager.migrate_student_id_links()
+        db_manager.migrate_core_columns()
         logger.info('Database initialized')
     except Exception as e:
         logger.warning(f"Database init skipped: {e}")

@@ -35,6 +35,9 @@ engine = create_engine(
 SessionFactory = sessionmaker(bind=engine)
 ScopedSession = scoped_session(SessionFactory)
 
+# 风险等级用于保守合并：状态回写只允许向更高风险升级，降级必须走显式人工/解决通道。
+RISK_ORDER = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+
 
 # ===================================================================
 #  ORM 模型定义
@@ -147,6 +150,10 @@ class AlertLog(Base):
     acknowledged_at = Column(DateTime, nullable=True, comment="确认时间")
     resolved_by = Column(Integer, nullable=True, comment="解决人用户ID")
     resolution = Column(Text, nullable=True, comment="解决备注")
+    escalated = Column(Boolean, default=False, nullable=False, comment="是否已升级至心理中心/学工处")
+    escalated_at = Column(DateTime, nullable=True, comment="升级时间")
+    escalated_by = Column(Integer, nullable=True, comment="升级人用户ID")
+    escalation_note = Column(Text, nullable=True, comment="升级说明")
 
     # 关系
     assignee = relationship("User", back_populates="alerts")
@@ -207,6 +214,23 @@ class Student(Base):
 
     def __repr__(self):
         return f"<Student(id={self.id}, student_id={self.student_id}, name={self.name})>"
+
+
+class StudentRiskEvidence(Base):
+    """学生风险证据时间线：记录每次状态合成的来源、结果和处置说明。"""
+    __tablename__ = "student_risk_evidence"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    source = Column(String(30), nullable=False, index=True)
+    risk_level = Column(String(20), nullable=False, default="low")
+    emotion_status = Column(String(50), nullable=True)
+    description = Column(Text, default="")
+    operator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    def __repr__(self):
+        return f"<StudentRiskEvidence(id={self.id}, student_id={self.student_id}, source={self.source})>"
 
 
 class StudentProfile(Base):
@@ -287,7 +311,7 @@ class Message(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
     counselor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    sender_type = Column(String(20), nullable=False, comment="\u53d1\u9001\u8005\u7c7b\u578b: student/counselor")
+    sender_type = Column(String(20), nullable=False, comment="\u53d1\u9001\u8005\u7c7b\u578b: student/counselor/assistant")
     sender_id = Column(Integer, nullable=False, comment="\u53d1\u9001\u8005ID")
     content = Column(Text, nullable=False, comment="\u6d88\u606f\u5185\u5bb9")
     message_type = Column(String(20), default="text", comment="\u6d88\u606f\u7c7b\u578b: text/image/file")
@@ -301,6 +325,48 @@ class Message(Base):
 
     def __repr__(self):
         return f"<Message(id={self.id}, sender={self.sender_type})>"
+
+
+class UserPresence(Base):
+    """\u6559\u5e08/\u8f85\u5bfc\u5458\u5728\u7ebf\u5fc3\u8df3\u72b6\u6001"""
+    __tablename__ = "user_presence"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    last_seen = Column(DateTime, default=datetime.now, nullable=False)
+    is_online = Column(Boolean, default=True, nullable=False)
+
+
+class DigitalHumanSettings(Base):
+    """\u8f85\u5bfc\u5458 AI \u6570\u5b57\u4eba\u8bbe\u7f6e"""
+    __tablename__ = "digital_human_settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    counselor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+    name = Column(String(40), default="\u5c0f\u804a", nullable=False)
+    humor = Column(Integer, default=3, nullable=False)
+    style = Column(String(20), default="humor", nullable=False)
+    delay = Column(Integer, default=2, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+
+class DigitalHumanLog(Base):
+    """\u6570\u5b57\u4eba\u4ee3\u8868\u8f85\u5bfc\u5458\u56de\u590d\u7684\u503c\u73ed\u65e5\u5fd7"""
+    __tablename__ = "digital_human_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    counselor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    message_id = Column(Integer, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True)
+    content = Column(Text, nullable=False)
+    crisis = Column(Boolean, default=False, nullable=False)
+    handled = Column(Boolean, default=False, nullable=False, comment="老师是否已处理")
+    handled_at = Column(DateTime, nullable=True, comment="处理时间")
+    handled_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="处理人用户ID")
+    handled_note = Column(Text, nullable=True, comment="处理备注")
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
 
 
 class Appointment(Base):
@@ -349,6 +415,7 @@ class Todo(Base):
     description = Column(Text, default="")
     category = Column(String(50), default="work_task", comment="student_care/work_task/other")
     priority = Column(String(20), default="medium", comment="high/medium/low")
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="SET NULL"), nullable=True, index=True, comment="学生关注待办关联的学生")
     due_date = Column(DateTime, nullable=True)
     is_completed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
@@ -463,6 +530,38 @@ class DatabaseManager:
                         ), {"sid": sid, "rid": rid})
                 conn.commit()
         print("[OK] student_id 外键迁移与回填完成")
+
+    def migrate_core_columns(self):
+        """为数字人日志和预警日志补充新增列（SQLite 已有表不自动加列）。"""
+        from sqlalchemy import text
+        migrations = {
+            "digital_human_logs": {
+                "handled": "BOOLEAN DEFAULT 0 NOT NULL",
+                "handled_at": "DATETIME",
+                "handled_by": "INTEGER",
+                "handled_note": "TEXT",
+            },
+            "alert_logs": {
+                "escalated": "BOOLEAN DEFAULT 0 NOT NULL",
+                "escalated_at": "DATETIME",
+                "escalated_by": "INTEGER",
+                "escalation_note": "TEXT",
+            },
+            "todos": {
+                "student_id": "INTEGER",
+            },
+        }
+        with self.engine.connect() as conn:
+            for table, columns in migrations.items():
+                try:
+                    existing = {r[1] for r in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()}
+                except Exception:
+                    continue
+                for column, ddl in columns.items():
+                    if column not in existing:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+            conn.commit()
+        print("[OK] core columns migration completed")
 
     def drop_all(self):
         """删除所有表（危险操作）"""
@@ -772,7 +871,15 @@ class DatabaseManager:
             from datetime import datetime as _dt, timedelta as _td
             today = _dt.now()
             start = today - _td(days=days)
-            logs = session.query(EmotionLog).filter(EmotionLog.created_at >= start).all()
+            query = session.query(EmotionLog).filter(EmotionLog.created_at >= start)
+            if student_id:
+                try:
+                    query = query.filter(EmotionLog.student_id == int(student_id))
+                except (TypeError, ValueError):
+                    query = query.filter(EmotionLog.student_id.is_(None))
+            if class_name:
+                query = query.filter(EmotionLog.student_class == class_name)
+            logs = query.all()
             daily_data = {}
             for i in range(days):
                 d = today - _td(days=days-1-i)
@@ -861,16 +968,31 @@ class DatabaseManager:
             return query.order_by(AlertLog.created_at.desc()).all()
 
     def search_alerts(self, student_name=None, risk_level=None, status=None,
-                      page=1, per_page=20, **kwargs):
-        """搜索预警"""
+                      page=1, per_page=20, assigned_to=None, role=None,
+                      emotion_type=None, escalated=None, student_id=None,
+                      **kwargs):
+        """搜索预警，支持辅导员的本人范围过滤和管理端的全局危机工单查询。"""
         with self.get_session() as session:
+            filters = kwargs.get("filters") or {}
             query = session.query(AlertLog)
+            student_name = student_name or filters.get("student_name")
+            risk_level = risk_level or filters.get("risk_level")
+            status = status or filters.get("status")
+            emotion_type = emotion_type or filters.get("emotion_type")
+            if assigned_to is not None:
+                query = query.filter(AlertLog.assigned_to == assigned_to)
             if student_name:
                 query = query.filter(AlertLog.student_name.contains(student_name))
             if risk_level:
                 query = query.filter(AlertLog.risk_level == risk_level)
             if status:
                 query = query.filter(AlertLog.status == status)
+            if emotion_type:
+                query = query.filter(AlertLog.emotion_type == emotion_type)
+            if student_id is not None:
+                query = query.filter(AlertLog.student_id == student_id)
+            if escalated is not None:
+                query = query.filter(AlertLog.escalated == bool(escalated))
 
             total = query.count()
             items = query.order_by(AlertLog.created_at.desc()) \
@@ -889,6 +1011,7 @@ class DatabaseManager:
             "status", "description", "emotion_type", "intensity",
             "assigned_to", "resolved_at", "acknowledged_by",
             "acknowledged_at", "resolved_by", "resolution",
+            "escalated", "escalated_at", "escalated_by", "escalation_note",
         }
         mapped = {k: v for k, v in (updates or {}).items() if k in allowed_fields}
         if not mapped:
@@ -1137,13 +1260,21 @@ class DatabaseManager:
             return {"items": [self._to_dict(r) for r in items], "total": total}
 
     def complete_reminder(self, reminder_id):
-        """标记提醒为已完成"""
+        """标记提醒为已完成，并返回后续回写学生状态所需的元数据。"""
         with self.get_session() as session:
             r = session.query(Reminder).get(reminder_id)
             if r:
+                student_id = r.student_id
+                reminder_type = r.reminder_type
+                counselor_id = r.counselor_id
                 r.is_completed = True
-                return True
-            return False
+                session.flush()
+                return {
+                    "student_id": student_id,
+                    "reminder_type": reminder_type or "",
+                    "counselor_id": counselor_id,
+                }
+            return None
 
     def get_student_stats(self):
         """获取学生统计数据"""
@@ -1336,15 +1467,184 @@ class DatabaseManager:
             return self._to_dict(student) if student else None
 
     def update_student_risk_state(self, student_id, risk_level, emotion_status):
-        """Update current student risk state and emotion status."""
+        """兼容旧调用：统一走证据化状态回写，避免多套覆盖语义。"""
+        return self.update_student_state_from_evidence(
+            student_id=student_id,
+            risk_level=risk_level,
+            emotion_status=emotion_status,
+            source="legacy_update",
+            description="旧接口兼容回写",
+        )
+
+    @staticmethod
+    def _normalize_risk_level(risk_level):
+        """将外部风险标签归一为 low/medium/high/critical。"""
+        value = str(risk_level or "low").strip().lower()
+        aliases = {
+            "normal": "low",
+            "none": "low",
+            "轻度": "medium",
+            "mild": "medium",
+            "中度": "medium",
+            "moderate": "medium",
+            "中重度": "high",
+            "mod_severe": "high",
+            "重度": "high",
+            "severe": "high",
+            "危急": "critical",
+            "危机": "high",
+        }
+        return aliases.get(value, value if value in ("low", "medium", "high", "critical") else "low")
+
+    @staticmethod
+    def _max_risk(a, b):
+        """风险等级取较高者，未知值按最低风险处理，保证危机证据不被稀释。"""
+        return a if RISK_ORDER.get(a, 0) >= RISK_ORDER.get(b, 0) else b
+
+    def update_student_state_from_evidence(self, student_id, risk_level, emotion_status,
+                                           source, counselor_id=None, description="",
+                                           follow_up_days=3):
+        """统一回写学生当前状态，并为中高风险创建跟进提醒。
+
+        source 用于区分证据入口，例如 talk_report / assessment / alert_resolution。
+        该函数只做证据写回，不读取散落的其它表，避免不同入口各自维护一套状态。
+        风险等级采用保守合并：后到的低风险不能覆盖先到的高风险；情绪状态按最新证据更新。
+        """
+        normalized_risk = self._normalize_risk_level(risk_level)
         with self.get_session() as session:
             student = session.query(Student).get(student_id)
             if not student:
-                return False
-            student.risk_level = risk_level or student.risk_level
-            student.emotion_status = emotion_status or student.emotion_status
+                return None
+
+            old_risk = student.risk_level or "low"
+            new_risk = self._max_risk(old_risk, normalized_risk)
+            clean_emotion = (emotion_status or "").strip()
+            if clean_emotion:
+                new_emotion = clean_emotion
+            elif new_risk in ("medium", "high", "critical"):
+                new_emotion = student.emotion_status or "需关注"
+            else:
+                new_emotion = "正常"
+
+            student.risk_level = new_risk
+            student.emotion_status = new_emotion
             student.updated_at = datetime.now()
-            return True
+
+            evidence = StudentRiskEvidence(
+                student_id=student_id,
+                source=source or "unknown",
+                risk_level=normalized_risk,
+                emotion_status=new_emotion,
+                description=description or "",
+                operator_id=counselor_id,
+            )
+            session.add(evidence)
+
+            if new_risk in ("medium", "high", "critical"):
+                reminder_type = f"{source}_followup"
+                existing = session.query(Reminder).filter(
+                    Reminder.student_id == student_id,
+                    Reminder.reminder_type == reminder_type,
+                    Reminder.is_completed == False,
+                ).first()
+                if not existing:
+                    reminder = Reminder(
+                        student_id=student_id,
+                        counselor_id=counselor_id or student.counselor_id,
+                        title=f"需跟进：{student.name}（{source}）",
+                        description=description or f"最新状态为 {new_risk}，请及时复核并补充跟进记录。",
+                        reminder_type=reminder_type,
+                        priority="high" if new_risk in ("high", "critical") else "medium",
+                        due_date=datetime.now() + timedelta(days=follow_up_days),
+                    )
+                    session.add(reminder)
+                    session.flush()
+                    reminder_id = reminder.id
+                else:
+                    reminder_id = existing.id
+            else:
+                reminder_id = None
+
+            session.flush()
+            return {"student_id": student_id, "risk_level": new_risk,
+                    "evidence_risk_level": normalized_risk,
+                    "emotion_status": student.emotion_status, "reminder_id": reminder_id}
+
+    def refresh_student_risk_after_alert_resolution(self, student_id):
+        """预警解决后，根据仍未解决的学生预警重新计算风险状态。
+
+        若仍存在高危/危急预警则保持 high/critical；存在中风险则 medium；
+        否则将学生从风险名单移出，并保留“待复核”的情绪状态提示。
+        该方法同时写入证据时间线，便于辅导员查看风险为什么变化。
+        """
+        if not student_id:
+            return None
+        with self.get_session() as session:
+            unresolved = session.query(AlertLog).filter(
+                AlertLog.student_id == student_id,
+                AlertLog.status != "resolved",
+            ).all()
+            high_pending = any(a.risk_level in ("high", "critical") for a in unresolved)
+            medium_pending = any(a.risk_level == "medium" for a in unresolved)
+            student = session.query(Student).get(student_id)
+            if not student:
+                return None
+            if high_pending:
+                new_risk = "high"
+                new_emotion = "仍有高危预警待处理"
+            elif medium_pending:
+                new_risk = "medium"
+                new_emotion = "仍有中风险预警待处理"
+            else:
+                new_risk = "low"
+                new_emotion = "预警已处理，待复核"
+            student.risk_level = new_risk
+            student.emotion_status = new_emotion
+            student.updated_at = datetime.now()
+            session.add(StudentRiskEvidence(
+                student_id=student_id,
+                source="alert_resolution",
+                risk_level=new_risk,
+                emotion_status=new_emotion,
+                description="预警处置后重算学生风险状态",
+            ))
+            return self._to_dict(student)
+
+    def manually_set_student_risk(self, student_id, risk_level, operator_id=None,
+                                  emotion_status="人工调整", reason=""):
+        """辅导员/学工处显式调整学生风险等级，允许降级，并记录审计证据。"""
+        normalized_risk = self._normalize_risk_level(risk_level)
+        with self.get_session() as session:
+            student = session.query(Student).get(student_id)
+            if not student:
+                return None
+            student.risk_level = normalized_risk
+            student.emotion_status = emotion_status or "人工调整"
+            student.updated_at = datetime.now()
+            session.add(StudentRiskEvidence(
+                student_id=student_id,
+                source="manual",
+                risk_level=normalized_risk,
+                emotion_status=student.emotion_status,
+                description=reason or "人工调整风险等级",
+                operator_id=operator_id,
+            ))
+            session.add(SystemLog(
+                user_id=operator_id,
+                action="人工调整学生风险等级",
+                target_type="student_risk",
+                target_id=student_id,
+                details={"risk_level": normalized_risk, "reason": reason},
+            ))
+            return self._to_dict(student)
+
+    def get_student_risk_timeline(self, student_id, limit=50):
+        """获取学生风险证据时间线，按时间倒序返回。"""
+        with self.get_session() as session:
+            items = session.query(StudentRiskEvidence).filter(
+                StudentRiskEvidence.student_id == student_id
+            ).order_by(StudentRiskEvidence.created_at.desc()).limit(limit).all()
+            return [self._to_dict(item) for item in items]
 
     def create_realtime_followup_reminder(self, student_id, counselor_id, title, description, priority, due_date):
         """Create or update a video-call emotion follow-up reminder."""
@@ -1401,6 +1701,145 @@ class DatabaseManager:
             session.flush()
             return msg.id
 
+    def get_message(self, message_id):
+        """获取单条消息的 JSON-safe 字典。"""
+        with self.get_session() as session:
+            msg = session.query(Message).filter(Message.id == message_id).first()
+            return self._to_dict(msg) if msg else None
+
+    # ------------------------------------------------------------------
+    #  Online presence / AI digital human
+    # ------------------------------------------------------------------
+
+    def ping_user_presence(self, user_id, is_online=True):
+        """刷新教师在线心跳，并返回当前是否在线。"""
+        with self.get_session() as session:
+            now = datetime.now()
+            row = session.query(UserPresence).filter(UserPresence.user_id == user_id).first()
+            if row:
+                row.last_seen = now
+                row.is_online = is_online
+            else:
+                session.add(UserPresence(user_id=user_id, last_seen=now, is_online=is_online))
+            return True
+
+    def get_user_presence(self, user_id, threshold_seconds=45):
+        """根据最近心跳时间判断教师是否在线。"""
+        with self.get_session() as session:
+            row = session.query(UserPresence).filter(UserPresence.user_id == user_id).first()
+            if not row or not row.last_seen:
+                return {"user_id": user_id, "online": False, "last_seen": None}
+            age = (datetime.now() - row.last_seen).total_seconds()
+            return {
+                "user_id": user_id,
+                "online": bool(row.is_online) and age <= threshold_seconds,
+                "last_seen": str(row.last_seen),
+            }
+
+    def get_digital_human_settings(self, counselor_id):
+        """获取数字人设置，未配置时返回默认值。"""
+        with self.get_session() as session:
+            row = session.query(DigitalHumanSettings).filter(
+                DigitalHumanSettings.counselor_id == counselor_id
+            ).first()
+            if row:
+                return {
+                    "id": row.id,
+                    "counselor_id": row.counselor_id,
+                    "enabled": row.enabled,
+                    "name": row.name,
+                    "humor": row.humor,
+                    "style": row.style,
+                    "delay": row.delay,
+                    "updated_at": str(row.updated_at),
+                }
+            return {
+                "id": None,
+                "counselor_id": counselor_id,
+                "enabled": False,
+                "name": "小聆",
+                "humor": 3,
+                "style": "humor",
+                "delay": 2,
+                "updated_at": None,
+            }
+
+    def save_digital_human_settings(self, counselor_id, payload):
+        """保存数字人设置，返回最新配置。"""
+        payload = payload or {}
+        name = (payload.get("name") or "小聆").strip()[:40] or "小聆"
+        humor = max(1, min(4, int(payload.get("humor") or 3)))
+        style = payload.get("style") if payload.get("style") in ("humor", "warm", "pro") else "humor"
+        delay = max(1, min(10, int(payload.get("delay") or 2)))
+        enabled = bool(payload.get("enabled", False))
+        with self.get_session() as session:
+            row = session.query(DigitalHumanSettings).filter(
+                DigitalHumanSettings.counselor_id == counselor_id
+            ).first()
+            if not row:
+                row = DigitalHumanSettings(counselor_id=counselor_id)
+                session.add(row)
+            row.enabled = enabled
+            row.name = name
+            row.humor = humor
+            row.style = style
+            row.delay = delay
+            session.flush()
+            return self._to_dict(row)
+
+    def get_digital_human_logs(self, counselor_id, limit=50, status=None):
+        """获取数字人值班日志，并附带学生姓名。"""
+        with self.get_session() as session:
+            query = session.query(DigitalHumanLog, Student.name).join(
+                Student, Student.id == DigitalHumanLog.student_id
+            ).filter(
+                DigitalHumanLog.counselor_id == counselor_id
+            )
+            if status == "pending":
+                query = query.filter(DigitalHumanLog.handled == False)
+            elif status == "handled":
+                query = query.filter(DigitalHumanLog.handled == True)
+            rows = query.order_by(
+                DigitalHumanLog.created_at.desc(),
+                DigitalHumanLog.id.desc(),
+            ).limit(limit).all()
+            logs = []
+            for log, student_name in rows:
+                item = self._to_dict(log)
+                item["student_name"] = student_name
+                logs.append(item)
+            return logs
+
+    def create_digital_human_log(self, counselor_id, student_id, message_id, content, crisis=False):
+        """写入一条数字人自动回复日志。"""
+        with self.get_session() as session:
+            log = DigitalHumanLog(
+                counselor_id=counselor_id,
+                student_id=student_id,
+                message_id=message_id,
+                content=content,
+                crisis=bool(crisis),
+            )
+            session.add(log)
+            session.flush()
+            return log.id
+
+    def mark_digital_human_log_handled(self, log_id, counselor_id, note=""):
+        """老师上线后将数字人值班日志标记为已处理。"""
+        with self.get_session() as session:
+            log = session.query(DigitalHumanLog).filter(
+                DigitalHumanLog.id == log_id,
+                DigitalHumanLog.counselor_id == counselor_id,
+            ).first()
+            if not log:
+                return None
+            log.handled = True
+            log.handled_at = datetime.now()
+            log.handled_by = counselor_id
+            log.handled_note = (note or "").strip() or None
+            session.flush()
+            return self._to_dict(log)
+
     def get_conversation_messages(self, student_id, counselor_id, page=1, per_page=50):
         """获取学生与辅导员的对话消息"""
         with self.get_session() as session:
@@ -1419,7 +1858,7 @@ class DatabaseManager:
                 session.query(Message).filter(
                     Message.student_id == student_id,
                     Message.counselor_id == counselor_id,
-                    Message.sender_type == "counselor",
+                    Message.sender_type.in_(("counselor", "assistant")),
                     Message.is_read == False,
                 ).update({"is_read": True})
             else:
@@ -1436,7 +1875,7 @@ class DatabaseManager:
             if user_type == "student":
                 count = session.query(func.count(Message.id)).filter(
                     Message.student_id == user_id,
-                    Message.sender_type == "counselor",
+                    Message.sender_type.in_(("counselor", "assistant")),
                     Message.is_read == False,
                 ).scalar()
             else:
@@ -1469,7 +1908,7 @@ class DatabaseManager:
                     func.count(Message.id).label('unread')
                 ).filter(
                     Message.student_id == user_id,
-                    Message.sender_type == "counselor",
+                    Message.sender_type.in_(("counselor", "assistant")),
                     Message.is_read == False
                 ).group_by(Message.counselor_id).subquery()
                 results = session.query(
@@ -1551,6 +1990,16 @@ class DatabaseManager:
             session.flush()
             return appt.id
 
+    def get_appointment(self, appointment_id):
+        """获取单条预约记录（包含关联学生姓名）。"""
+        with self.get_session() as session:
+            appt = session.query(Appointment).filter(Appointment.id == appointment_id).first()
+            if not appt:
+                return None
+            item = self._to_dict(appt)
+            item["student_name"] = appt.student.name if appt.student else ""
+            return item
+
     def get_appointments(self, user_id, user_type, status=None, page=1, per_page=20):
         """获取预约列表"""
         with self.get_session() as session:
@@ -1563,7 +2012,13 @@ class DatabaseManager:
                 query = query.filter(Appointment.status == status)
             total = query.count()
             items = query.order_by(Appointment.appointment_time.desc()).offset((page-1)*per_page).limit(per_page).all()
-            return {"items": [self._to_dict(a) for a in items], "total": total}
+            result = []
+            for a in items:
+                item = self._to_dict(a)
+                item["student_name"] = a.student.name if a.student else ""
+                item["counselor_name"] = a.counselor.display_name if a.counselor else ""
+                result.append(item)
+            return {"items": result, "total": total}
 
     def update_appointment_status(self, appointment_id, status, notes=None):
         """更新预约状态"""
@@ -1571,8 +2026,8 @@ class DatabaseManager:
             updates = {"status": status}
             if notes:
                 updates["notes"] = notes
-            session.query(Appointment).filter(Appointment.id == appointment_id).update(updates)
-            return True
+            rows = session.query(Appointment).filter(Appointment.id == appointment_id).update(updates)
+            return rows > 0
 
     def get_calendar_events(self, year, month):
         """获取日历月的提醒和跟进事件"""
@@ -1642,12 +2097,13 @@ class DatabaseManager:
     #  Todo CRUD (自定义待办)
     # ------------------------------------------------------------------
     def create_todo(self, user_id, title, description="", category="work_task",
-                    priority="medium", due_date=None):
+                    priority="medium", due_date=None, student_id=None):
         """创建自定义待办"""
         with self.get_session() as session:
             todo = Todo(
                 user_id=user_id, title=title, description=description,
                 category=category, priority=priority, due_date=due_date,
+                student_id=student_id,
             )
             session.add(todo)
             session.flush()
@@ -1669,13 +2125,23 @@ class DatabaseManager:
             return {"items": [self._to_dict(t) for t in items], "total": total}
 
     def complete_todo(self, todo_id):
-        """标记待办为已完成"""
+        """标记待办为已完成，并返回后续回写学生状态所需的元数据。"""
         with self.get_session() as session:
             t = session.query(Todo).get(todo_id)
             if t:
+                category = t.category
+                student_id = t.student_id
+                user_id = t.user_id
+                title = t.title
                 t.is_completed = True
-                return True
-            return False
+                session.flush()
+                return {
+                    "category": category,
+                    "student_id": student_id,
+                    "user_id": user_id,
+                    "title": title,
+                }
+            return None
 
     def delete_todo(self, todo_id):
         """删除待办"""
@@ -1823,11 +2289,15 @@ class DatabaseManager:
                     Todo.is_completed == False,
                 ).order_by(Todo.priority.desc(), Todo.due_date.asc()).limit(15).all()
                 for t in todos:
+                    todo_student_name = t.student.name if t.student else ""
+                    todo_student_no = t.student.student_id if t.student else ""
                     reminder_items.append({
                         "id": f"todo_{t.id}", "source": "todo",
                         "category": t.category or "work_task",
-                        "title": t.title, "student_name": "",
-                        "student_id": "", "priority": t.priority,
+                        "title": t.title, "student_name": todo_student_name,
+                        "student_id": todo_student_no,
+                        "student_db_id": t.student_id,
+                        "priority": t.priority,
                         "due_date": t.due_date.strftime("%Y-%m-%d %H:%M") if t.due_date else today_str,
                         "description": t.description or "",
                     })

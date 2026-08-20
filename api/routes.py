@@ -10,6 +10,8 @@ import io
 import json
 import uuid
 import logging
+import threading
+import time
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -28,6 +30,7 @@ from core.emotion_engine import EmotionAnalyzer, RiskAlertSystem
 from core.prompt_engine import ConversationEngine, PromptManager
 from core.database import DatabaseManager, AuthManager
 from core.realtime_emotion import get_or_create_analyzer, cleanup_session
+from core.digital_human import generate_reply, digital_human_status
 from config.config import load_config
 
 # ---------------------------------------------------------------------------
@@ -107,9 +110,45 @@ def emit_network_graph_update(student_name=None):
         _socketio.emit("emotion_graph_update", {
             "student_name": student_name or "",
             "ts": datetime.now().isoformat(),
-        }, broadcast=True)
+        })
     except Exception as exc:
         logger.warning("网络图刷新事件推送失败: %s", exc)
+
+
+def emit_alert_created(alert):
+    """向辅导员/学工处广播新预警，供前端即时刷新并提示。"""
+    if _socketio is None or not alert:
+        return
+    try:
+        _socketio.emit("alert_created", alert)
+    except Exception as exc:
+        logger.warning("预警实时推送失败: %s", exc)
+
+
+def emit_new_message(room, message):
+    """向指定聊天房间实时推送消息。"""
+    if _socketio is None:
+        return
+    try:
+        _socketio.emit("new_message", message, room=room)
+    except Exception as exc:
+        logger.warning("新消息实时推送失败: %s", exc)
+
+
+def emit_conversation_message(message):
+    """把一条会话消息推送到教师收件箱和对应学生的专属会话房间。"""
+    if not message:
+        return
+    student_id = message.get("student_id")
+    counselor_id = message.get("counselor_id")
+    if student_id is None or counselor_id is None:
+        return
+    rooms = [
+        f"teacher_chat_{counselor_id}",
+        f"student_chat_{student_id}_{counselor_id}",
+    ]
+    for room in rooms:
+        emit_new_message(room, message)
 
 
 def init_services(app):
@@ -571,10 +610,182 @@ def send_message():
         file_url=file_url,
     )
 
+    # 统一由服务端实时推送，客户端不再自行转发，避免房间串线和重复消息。
+    created_msg = db.get_message(msg_id)
+    if created_msg:
+        emit_conversation_message(created_msg)
+
+    # 学生给辅导员发消息，且辅导员离线、数字人已开启时，异步生成 AI 分身回复。
+    ai_reply_pending = False
+    if user_type == "student":
+        try:
+            presence = db.get_user_presence(counselor_id)
+            settings = db.get_digital_human_settings(counselor_id)
+            if not presence.get("online") and settings.get("enabled"):
+                student = db.get_student_by_id(student_id) or {}
+                student_name = student.get("name") or ""
+                student_class = student.get("class_name") or ""
+                delay = max(0, min(int(settings.get("delay") or 0), 10))
+                ai_reply_pending = True
+
+                def _deliver_assistant_reply():
+                    try:
+                        if delay:
+                            time.sleep(delay)
+                        reply, crisis = generate_reply(content, settings, student_name)
+                        reply_id = db.create_message(
+                            student_id=student_id,
+                            counselor_id=counselor_id,
+                            sender_type="assistant",
+                            sender_id=counselor_id,
+                            content=reply,
+                            message_type="text",
+                            file_url=None,
+                        )
+                        db.create_digital_human_log(
+                            counselor_id=counselor_id,
+                            student_id=student_id,
+                            message_id=msg_id,
+                            content=reply,
+                            crisis=crisis,
+                        )
+                        if crisis:
+                            try:
+                                alert_id = db.create_alert(
+                                    student_name=student_name,
+                                    student_class=student_class,
+                                    risk_level="high",
+                                    emotion_type="危机",
+                                    intensity=10,
+                                    description="数字人对话中识别到自伤/危机信号：{}".format(content[:200]),
+                                    assigned_to=counselor_id,
+                                    student_id=student_id,
+                                )
+                                alert = db.get_alert(alert_id)
+                                emit_alert_created(alert)
+                            except Exception as alert_exc:
+                                logger.warning("数字人危机预警生成失败: %s", alert_exc)
+                        reply_msg = db.get_message(reply_id)
+                        if reply_msg:
+                            emit_conversation_message(reply_msg)
+                    except Exception as exc:
+                        logger.warning("数字人自动回复生成失败: %s", exc)
+
+                threading.Thread(target=_deliver_assistant_reply, daemon=True).start()
+        except Exception as exc:
+            logger.warning("数字人离线状态判断失败: %s", exc)
+
     return jsonify({
         "success": True,
-        "data": {"id": msg_id},
+        "data": {"id": msg_id, "ai_reply_pending": ai_reply_pending},
     }), 200
+
+
+@api.route("/digital-human/settings", methods=["GET"])
+@role_required(["counselor"])
+def get_digital_human_settings():
+    """获取当前辅导员的 AI 数字人设置。"""
+    try:
+        settings = db.get_digital_human_settings(g.user_id)
+        return jsonify({"success": True, "data": settings}), 200
+    except Exception as exc:
+        logger.error("获取数字人设置失败: %s", exc)
+        return jsonify({"success": False, "message": "获取数字人设置失败"}), 500
+
+
+@api.route("/digital-human/settings", methods=["PUT"])
+@role_required(["counselor"])
+def update_digital_human_settings():
+    """保存当前辅导员的 AI 数字人设置。"""
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({"success": False, "message": "请提供设置数据"}), 400
+    try:
+        settings = db.save_digital_human_settings(g.user_id, data)
+        return jsonify({"success": True, "data": settings}), 200
+    except Exception as exc:
+        logger.error("保存数字人设置失败: %s", exc)
+        return jsonify({"success": False, "message": "保存数字人设置失败"}), 500
+
+
+@api.route("/digital-human/logs", methods=["GET"])
+@role_required(["counselor"])
+def get_digital_human_logs():
+    """获取当前辅导员的数字人值班日志。"""
+    try:
+        status = request.args.get("status")
+        logs = db.get_digital_human_logs(g.user_id, status=status)
+        return jsonify({"success": True, "data": logs}), 200
+    except Exception as exc:
+        logger.error("获取数字人日志失败: %s", exc)
+        return jsonify({"success": False, "message": "获取数字人日志失败"}), 500
+
+
+@api.route("/digital-human/logs/<int:log_id>/handle", methods=["PUT"])
+@role_required(["counselor"])
+@log_action("处理数字人值班日志")
+def handle_digital_human_log(log_id):
+    """老师上线后将一条数字人自动回复标记为已处理。"""
+    data = request.get_json(silent=True) or {}
+    try:
+        updated = db.mark_digital_human_log_handled(log_id, g.user_id, data.get("note"))
+        if updated is None:
+            return jsonify({"success": False, "message": "日志不存在或无权处理"}), 404
+        return jsonify({"success": True, "message": "已标记处理", "data": updated}), 200
+    except Exception as exc:
+        logger.error("处理数字人值班日志失败: %s", exc)
+        return jsonify({"success": False, "message": "操作失败，请稍后重试"}), 500
+
+
+@api.route("/digital-human/preview", methods=["POST"])
+@role_required(["counselor"])
+def preview_digital_human():
+    """在教师端试聊页面生成数字人回复。"""
+    data = request.get_json(silent=True)
+    if not data or not (data.get("message") or "").strip():
+        return jsonify({"success": False, "message": "请输入试聊内容"}), 400
+    try:
+        settings = db.get_digital_human_settings(g.user_id)
+        student_name = "同学"
+        reply, crisis = generate_reply(data["message"], settings, student_name)
+        return jsonify({
+            "success": True,
+            "data": {"reply": reply, "crisis": crisis},
+        }), 200
+    except Exception as exc:
+        logger.error("数字人试聊失败: %s", exc)
+        return jsonify({"success": False, "message": "数字人试聊失败"}), 500
+
+
+@api.route("/digital-human/status/<int:counselor_id>", methods=["GET"])
+@auth_required
+def get_digital_human_status(counselor_id):
+    """获取指定辅导员在线状态与 AI 数字人状态。"""
+    try:
+        presence = db.get_user_presence(counselor_id)
+        settings = db.get_digital_human_settings(counselor_id)
+        return jsonify({
+            "success": True,
+            "data": digital_human_status(presence, settings),
+        }), 200
+    except Exception as exc:
+        logger.error("获取数字人状态失败: %s", exc)
+        return jsonify({"success": False, "message": "获取数字人状态失败"}), 500
+
+
+@api.route("/presence/ping", methods=["POST"])
+@role_required(["counselor"])
+def presence_ping():
+    """刷新辅导员在线心跳。"""
+    try:
+        db.ping_user_presence(g.user_id, True)
+        return jsonify({
+            "success": True,
+            "data": {"online": True, "user_id": g.user_id},
+        }), 200
+    except Exception as exc:
+        logger.error("在线心跳刷新失败: %s", exc)
+        return jsonify({"success": False, "message": "在线状态更新失败"}), 500
 
 
 @api.route("/messages/unread", methods=["GET"])
@@ -1052,6 +1263,18 @@ def generate_conversation_report():
             risk_level=report.get("risk_level", "low"),
             counselor_impression="AI 辅助生成，建议辅导员复核补充。",
         )
+        emotion_tags = report.get("emotion_tags") or {}
+        emotion_status = ""
+        if isinstance(emotion_tags, dict):
+            emotion_status = emotion_tags.get("primary") or emotion_tags.get("emotion") or ""
+        db.update_student_state_from_evidence(
+            student_id=student_id,
+            risk_level=report.get("risk_level", "low"),
+            emotion_status=emotion_status,
+            source="talk_report",
+            counselor_id=counselor_id,
+            description="谈心记录已生成，请复核学生当前风险状态。",
+        )
     except Exception as exc:
         logger.error("谈心记录保存失败: %s", exc)
 
@@ -1128,7 +1351,7 @@ def create_appointment():
 
 
 @api.route("/appointments/<int:appt_id>/status", methods=["PUT"])
-@auth_required
+@role_required(["counselor", "super_admin", "student_affairs"])
 def update_appointment_status(appt_id):
     """更新预约状态"""
     data = request.get_json(silent=True)
@@ -1141,7 +1364,57 @@ def update_appointment_status(appt_id):
     if status not in ["pending", "confirmed", "completed", "cancelled"]:
         return jsonify({"success": False, "message": "无效的状态"}), 400
 
+    existing = db.get_appointment(appt_id)
+    if existing is None:
+        return jsonify({"success": False, "message": "预约不存在"}), 404
+
+    previous_status = existing.get("status")
     db.update_appointment_status(appt_id, status, notes)
+
+    # confirmed：自动进入辅导员待办；completed：沉淀为谈心记录。
+    try:
+        if status == "confirmed" and previous_status != "confirmed":
+            counselor_id = existing.get("counselor_id")
+            student_name = existing.get("student_name") or "学生"
+            appointment_time = existing.get("appointment_time") or ""
+            reason = existing.get("reason") or "视频咨询"
+            duration = existing.get("duration") or 30
+            try:
+                due_datetime = datetime.fromisoformat(str(appointment_time).replace('Z', '+00:00'))
+            except Exception:
+                due_datetime = None
+            db.create_todo(
+                user_id=counselor_id,
+                title=f"预约：{student_name} - {reason}",
+                description=f"预约时间 {appointment_time}，预计 {duration} 分钟。",
+                category="appointment",
+                priority="medium",
+                due_date=due_datetime,
+                student_id=existing.get("student_id"),
+            )
+        elif status == "completed":
+            student_id = existing.get("student_id")
+            appointment_time = existing.get("appointment_time") or ""
+            reason = existing.get("reason") or "视频咨询"
+            summary = f"预约完成：{reason}（{appointment_time}）"
+            if notes:
+                summary += f"\n备注：{notes}"
+            db.create_student_profile(
+                student_id=student_id,
+                counselor_id=existing.get("counselor_id"),
+                record_type="appointment_completed",
+                summary=summary,
+                structured_content=json.dumps({
+                    "appointment_time": appointment_time,
+                    "reason": reason,
+                    "notes": notes or "",
+                }, ensure_ascii=False),
+                emotion_tags=None,
+                risk_level="low",
+                counselor_impression="预约完成自动沉淀，建议补充具体谈心记录。",
+            )
+    except Exception as exc:
+        logger.error("预约状态联动失败: %s", exc)
 
     return jsonify({
         "success": True,
@@ -2296,7 +2569,14 @@ def create_realtime_emotion_summary():
                 recorded_by=analyzer_id,
                 auto_reminder=False,
             )
-            db.update_student_risk_state(sid, risk_level, peak_emotion)
+            db.update_student_state_from_evidence(
+                student_id=sid,
+                risk_level=risk_level,
+                emotion_status=peak_emotion,
+                source="video_call_summary",
+                counselor_id=analyzer_id,
+                description="视频通话情绪总结已回写学生状态",
+            )
             reminder_id = db.create_realtime_followup_reminder(
                 student_id=sid,
                 counselor_id=analyzer_id,
@@ -2452,6 +2732,8 @@ def emotion_trends():
         days = min(365, max(1, request.args.get("days", 30, type=int)))
         student_id = request.args.get("student_id")
         class_name = request.args.get("class_name")
+        if getattr(g, "user_type", "staff") == "student":
+            student_id = g.student_id
 
         trends = db.get_emotion_trends(
             days=days,
@@ -2515,7 +2797,7 @@ def test_accounts():
 # ===================================================================
 
 @api.route("/alert/list", methods=["GET"])
-@auth_required
+@role_required(["counselor", "super_admin", "student_affairs"])
 @log_action("查看预警列表")
 def list_alerts():
     """分页获取风险预警列表。"""
@@ -2532,8 +2814,12 @@ def list_alerts():
         page = max(1, request.args.get("page", 1, type=int))
         per_page = min(100, max(1, request.args.get("per_page", 20, type=int)))
 
+        assigned_to = g.user_id if g.role == "counselor" else None
         result = db.search_alerts(
-            filters=filters,
+            student_name=request.args.get("student_name"),
+            risk_level=filters.get("risk_level"),
+            status=filters.get("status"),
+            assigned_to=assigned_to,
             page=page,
             per_page=per_page,
         )
@@ -2554,7 +2840,7 @@ def list_alerts():
 
 
 @api.route("/alert/<int:alert_id>/acknowledge", methods=["PUT"])
-@auth_required
+@role_required(["counselor", "super_admin", "student_affairs"])
 @log_action("确认预警")
 def acknowledge_alert(alert_id):
     """将预警标记为已确认。"""
@@ -2569,7 +2855,7 @@ def acknowledge_alert(alert_id):
         db.update_alert(alert_id, {
             "status": "acknowledged",
             "acknowledged_by": g.user_id,
-            "acknowledged_at": datetime.utcnow().isoformat(),
+            "acknowledged_at": datetime.utcnow(),
         })
         return jsonify({"success": True, "message": "预警已确认"}), 200
     except Exception as exc:
@@ -2578,7 +2864,7 @@ def acknowledge_alert(alert_id):
 
 
 @api.route("/alert/<int:alert_id>/resolve", methods=["PUT"])
-@auth_required
+@role_required(["counselor", "super_admin", "student_affairs"])
 @log_action("解决预警")
 def resolve_alert(alert_id):
     """将预警标记为已解决。"""
@@ -2592,16 +2878,128 @@ def resolve_alert(alert_id):
         updates = {
             "status": "resolved",
             "resolved_by": g.user_id,
-            "resolved_at": datetime.utcnow().isoformat(),
+            "resolved_at": datetime.utcnow(),
         }
         resolution = data.get("resolution")
         if resolution:
             updates["resolution"] = resolution
 
         db.update_alert(alert_id, updates)
+        if existing.get("student_id"):
+            db.refresh_student_risk_after_alert_resolution(existing["student_id"])
         return jsonify({"success": True, "message": "预警已解决"}), 200
     except Exception as exc:
         logger.error("解决预警失败: %s", exc)
+        return jsonify({"success": False, "message": "操作失败，请稍后重试"}), 500
+
+
+@api.route("/alert/crisis-center", methods=["GET"])
+@role_required(["super_admin", "student_affairs"])
+@log_action("查看危机工单中心")
+def crisis_center_alerts():
+    """心理中心/学工处跨辅导员查看所有危机预警。"""
+    try:
+        page = max(1, request.args.get("page", 1, type=int))
+        per_page = min(100, max(1, request.args.get("per_page", 20, type=int)))
+        escalated = request.args.get("escalated")
+        if escalated is not None:
+            escalated = escalated.lower() in ("1", "true", "yes")
+        result = db.search_alerts(
+            emotion_type="危机",
+            status=request.args.get("status"),
+            risk_level=request.args.get("risk_level"),
+            assigned_to=request.args.get("assigned_to", type=int) or None,
+            escalated=escalated,
+            page=page,
+            per_page=per_page,
+        )
+        return jsonify({
+            "success": True,
+            "data": result.get("items", []),
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": result.get("total", 0),
+            },
+        }), 200
+    except Exception as exc:
+        logger.error("获取危机工单中心失败: %s", exc)
+        return jsonify({"success": False, "message": "获取危机工单中心失败"}), 500
+
+
+@api.route("/alert/crisis-center/<int:alert_id>/assign", methods=["PUT"])
+@role_required(["super_admin", "student_affairs"])
+@log_action("指派危机工单")
+def assign_crisis_alert(alert_id):
+    """学工处/管理员将危机工单指派给具体辅导员。"""
+    data = request.get_json(silent=True) or {}
+    try:
+        existing = db.get_alert(alert_id)
+        if existing is None:
+            return jsonify({"success": False, "message": "危机工单不存在"}), 404
+        assigned_to = data.get("assigned_to")
+        if not isinstance(assigned_to, int) or assigned_to <= 0:
+            return jsonify({"success": False, "message": "请选择有效辅导员"}), 400
+        updates = {"assigned_to": assigned_to}
+        if not existing.get("escalated"):
+            updates.update({
+                "escalated": True,
+                "escalated_by": g.user_id,
+                "escalated_at": datetime.utcnow(),
+                "escalation_note": data.get("note") or "学工处/心理中心已指派危机处置人",
+            })
+        db.update_alert(alert_id, updates)
+        return jsonify({"success": True, "message": "危机工单已指派"}), 200
+    except Exception as exc:
+        logger.error("指派危机工单失败: %s", exc)
+        return jsonify({"success": False, "message": "操作失败，请稍后重试"}), 500
+
+
+@api.route("/alert/crisis-center/<int:alert_id>/close", methods=["PUT"])
+@role_required(["super_admin", "student_affairs"])
+@log_action("关闭危机工单")
+def close_crisis_alert(alert_id):
+    """学工处/管理员关闭危机工单，并重算学生风险状态。"""
+    data = request.get_json(silent=True) or {}
+    try:
+        existing = db.get_alert(alert_id)
+        if existing is None:
+            return jsonify({"success": False, "message": "危机工单不存在"}), 404
+        if existing.get("status") == "resolved":
+            return jsonify({"success": False, "message": "该危机工单已关闭"}), 400
+        db.update_alert(alert_id, {
+            "status": "resolved",
+            "resolved_by": g.user_id,
+            "resolved_at": datetime.utcnow(),
+            "resolution": (data.get("resolution") or "危机工单已由学工处/心理中心关闭").strip(),
+        })
+        if existing.get("student_id"):
+            db.refresh_student_risk_after_alert_resolution(existing["student_id"])
+        return jsonify({"success": True, "message": "危机工单已关闭"}), 200
+    except Exception as exc:
+        logger.error("关闭危机工单失败: %s", exc)
+        return jsonify({"success": False, "message": "操作失败，请稍后重试"}), 500
+
+
+@api.route("/alert/<int:alert_id>/escalate", methods=["PUT"])
+@role_required(["counselor", "super_admin", "student_affairs"])
+@log_action("升级危机预警")
+def escalate_alert(alert_id):
+    """将预警升级到心理中心/学工处，跨角色可见。"""
+    data = request.get_json(silent=True) or {}
+    try:
+        existing = db.get_alert(alert_id)
+        if existing is None:
+            return jsonify({"success": False, "message": "预警记录不存在"}), 404
+        db.update_alert(alert_id, {
+            "escalated": True,
+            "escalated_by": g.user_id,
+            "escalated_at": datetime.utcnow(),
+            "escalation_note": data.get("note") or "预警升级至心理中心/学工处协同处置",
+        })
+        return jsonify({"success": True, "message": "预警已升级"}), 200
+    except Exception as exc:
+        logger.error("升级危机预警失败: %s", exc)
         return jsonify({"success": False, "message": "操作失败，请稍后重试"}), 500
 
 
@@ -2677,13 +3075,26 @@ def list_documents():
         page = max(1, request.args.get("page", 1, type=int))
         per_page = min(100, max(1, request.args.get("per_page", 20, type=int)))
 
-        # Build document list from internal index
+        # 优先使用文档级索引，返回真实文件名和创建时间；旧索引兜底。
         seen = {}
-        for item in knowledge_base._documents:
-            did = item.get("doc_id", "unknown")
-            if did not in seen:
-                seen[did] = {"doc_id": did, "filename": did, "chunk_count": 0}
-            seen[did]["chunk_count"] += 1
+        for did, info in getattr(knowledge_base, "_doc_index", {}).items():
+            seen[did] = {
+                "doc_id": did,
+                "filename": info.get("source") or did,
+                "chunk_count": info.get("chunk_count", 0),
+                "created_at": info.get("created_at", ""),
+            }
+        if not seen:
+            for item in knowledge_base._documents:
+                did = item.get("doc_id", "unknown")
+                if did not in seen:
+                    seen[did] = {
+                        "doc_id": did,
+                        "filename": item.get("metadata", {}).get("source") or did,
+                        "chunk_count": 0,
+                        "created_at": item.get("metadata", {}).get("created_at", ""),
+                    }
+                seen[did]["chunk_count"] += 1
         docs = list(seen.values())
         total = len(docs)
         start = (page - 1) * per_page
@@ -2700,8 +3111,8 @@ def list_documents():
 def delete_document(document_id):
     """从知识库中删除指定文档。"""
     try:
-        success = knowledge_base.delete_document(document_id)
-        if not success:
+        result = knowledge_base.delete_document(document_id)
+        if result.get("status") not in ("deleted",):
             return jsonify({"success": False, "message": "文档不存在"}), 404
         return jsonify({"success": True, "message": "文档已删除"}), 200
     except Exception as exc:
@@ -2757,7 +3168,7 @@ def search_knowledge():
 
 
 @api.route("/knowledge/stats", methods=["GET"])
-@role_required(["super_admin", "student_affairs"])
+@role_required(["super_admin", "student_affairs", "counselor"])
 @log_action("查看知识库统计")
 def knowledge_stats():
     """获取知识库的统计数据。"""
@@ -2825,7 +3236,7 @@ def dashboard():
         total_emo = len(emo_items) if emo_items else 1
         emotion_dist = {k: round(v / total_emo * 100) for k, v in emo_counts.most_common(6)}
 
-        # ????
+        # 汇总风险等级分布
         alert_result_all = db.search_alerts(page=1, per_page=10000)
         all_alerts = alert_result_all.get("items", [])
         risk_counts = Counter(a.get("risk_level", "low") for a in all_alerts)
@@ -2835,7 +3246,7 @@ def dashboard():
             "low": risk_counts.get("low", 0),
         }
 
-        # ??7???
+        # 汇总最近 7 天情绪趋势
         from datetime import datetime as _dt, timedelta as _td
         today = _dt.now()
         trend_data = []
@@ -2941,7 +3352,12 @@ def update_student(sid):
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"success": False, "message": "请提供更新数据"}), 400
-    allowed = {"name", "gender", "college", "class_name", "phone", "notes", "risk_level", "emotion_status"}
+    if "risk_level" in data or "emotion_status" in data:
+        return jsonify({
+            "success": False,
+            "message": "风险状态请使用 /student/<sid>/risk 人工调整接口，避免绕过证据时间线",
+        }), 400
+    allowed = {"name", "gender", "college", "class_name", "phone", "notes"}
     updates = {k: v for k, v in data.items() if k in allowed}
     if not updates:
         return jsonify({"success": False, "message": "没有可更新的字段"}), 400
@@ -2949,6 +3365,47 @@ def update_student(sid):
     if ok:
         return jsonify({"success": True, "message": "更新成功"}), 200
     return jsonify({"success": False, "message": "学生不存在"}), 404
+
+
+@api.route("/student/<int:sid>/risk", methods=["PUT"])
+@role_required(["counselor", "super_admin", "student_affairs"])
+@log_action("人工调整学生风险等级")
+def manually_adjust_student_risk(sid):
+    """辅导员/学工处显式调整学生风险等级，支持降级并记录审计。"""
+    data = request.get_json(silent=True) or {}
+    allowed = {"none", "low", "medium", "high", "critical",
+               "normal", "mild", "moderate", "severe",
+               "轻度", "中度", "中重度", "重度", "危急", "危机"}
+    risk_level = data.get("risk_level")
+    if not risk_level or risk_level not in allowed:
+        return jsonify({"success": False, "message": "风险等级无效"}), 400
+    try:
+        updated = db.manually_set_student_risk(
+            student_id=sid,
+            risk_level=risk_level,
+            operator_id=g.user_id,
+            emotion_status=(data.get("emotion_status") or "人工调整").strip(),
+            reason=(data.get("reason") or "人工调整风险等级").strip(),
+        )
+        if updated is None:
+            return jsonify({"success": False, "message": "学生不存在"}), 404
+        return jsonify({"success": True, "message": "风险等级已更新", "data": updated}), 200
+    except Exception as exc:
+        logger.error("人工调整学生风险等级失败: %s", exc)
+        return jsonify({"success": False, "message": "操作失败，请稍后重试"}), 500
+
+
+@api.route("/student/<int:sid>/risk-timeline", methods=["GET"])
+@role_required(["counselor", "super_admin", "student_affairs"])
+@log_action("查看学生风险时间线")
+def get_student_risk_timeline(sid):
+    """返回学生风险证据时间线，解释当前风险等级的来源。"""
+    try:
+        timeline = db.get_student_risk_timeline(sid)
+        return jsonify({"success": True, "data": timeline}), 200
+    except Exception as exc:
+        logger.error("获取学生风险时间线失败: %s", exc)
+        return jsonify({"success": False, "message": "获取风险时间线失败"}), 500
 
 
 @api.route("/student/<int:sid>/profiles", methods=["GET"])
@@ -3032,8 +3489,21 @@ def list_reminders():
 @auth_required
 @log_action("完成提醒")
 def complete_reminder_route(rid):
-    ok = db.complete_reminder(rid)
-    if ok:
+    meta = db.complete_reminder(rid)
+    if meta is not None:
+        reminder_type = meta.get("reminder_type") or ""
+        if reminder_type == "emotion_check" or reminder_type.endswith("_followup"):
+            try:
+                db.update_student_state_from_evidence(
+                    student_id=meta.get("student_id"),
+                    risk_level="low",
+                    emotion_status="已跟进",
+                    source="reminder_done",
+                    counselor_id=meta.get("counselor_id"),
+                    description="提醒已完成，学生状态已同步跟进记录",
+                )
+            except Exception as exc:
+                logger.warning("提醒完成后的学生状态回写失败: %s", exc)
         return jsonify({"success": True, "message": "提醒已完成"}), 200
     return jsonify({"success": False, "message": "提醒不存在"}), 404
 
@@ -3084,6 +3554,11 @@ def add_todo():
         return jsonify({"success": False, "message": "请输入待办标题"}), 400
 
     try:
+        student_id = data.get("student_id")
+        if student_id in (None, "", 0):
+            student_id = None
+        else:
+            student_id = int(student_id)
         tid = db.create_todo(
             user_id=g.user_id,
             title=data["title"],
@@ -3091,6 +3566,7 @@ def add_todo():
             category=data.get("category", "work_task"),
             priority=data.get("priority", "medium"),
             due_date=data.get("due_date"),
+            student_id=student_id,
         )
         return jsonify({"success": True, "message": "待办已添加", "data": {"id": tid}}), 201
     except Exception as exc:
@@ -3103,8 +3579,20 @@ def add_todo():
 @log_action("完成待办")
 def complete_todo(tid):
     """标记自定义待办为已完成"""
-    ok = db.complete_todo(tid)
-    if ok:
+    meta = db.complete_todo(tid)
+    if meta is not None:
+        if meta.get("category") == "student_care" and meta.get("student_id"):
+            try:
+                db.update_student_state_from_evidence(
+                    student_id=meta.get("student_id"),
+                    risk_level="low",
+                    emotion_status="已跟进",
+                    source="todo_done",
+                    counselor_id=meta.get("user_id"),
+                    description=f"学生关注待办「{meta.get('title') or '学生跟进'}」已完成",
+                )
+            except Exception as exc:
+                logger.warning("待办完成后的学生状态回写失败: %s", exc)
         return jsonify({"success": True, "message": "已完成"}), 200
     return jsonify({"success": False, "message": "待办不存在"}), 404
 
@@ -3145,8 +3633,21 @@ def today_workplan():
 def complete_workplan_item(rid):
     """标记一个提醒为已完成"""
     try:
-        ok = db.complete_reminder(rid)
-        if ok:
+        meta = db.complete_reminder(rid)
+        if meta is not None:
+            reminder_type = meta.get("reminder_type") or ""
+            if reminder_type == "emotion_check" or reminder_type.endswith("_followup"):
+                try:
+                    db.update_student_state_from_evidence(
+                        student_id=meta.get("student_id"),
+                        risk_level="low",
+                        emotion_status="已跟进",
+                        source="reminder_done",
+                        counselor_id=meta.get("counselor_id"),
+                        description="工作台提醒已完成，学生状态已同步跟进记录",
+                    )
+                except Exception as exc:
+                    logger.warning("工作台提醒完成后的学生状态回写失败: %s", exc)
             return jsonify({"success": True, "message": "已完成"}), 200
         return jsonify({"success": False, "message": "提醒不存在"}), 404
     except Exception as exc:
@@ -3294,6 +3795,34 @@ def submit_assessment():
     except Exception as e:
         logger.error("保存测评失败: %s", e)
         return jsonify({"success": False, "message": "保存失败"}), 500
+
+    # 将测评结果回写学生档案，普通中高风险不再只静默落库。
+    if p_level in ("mod_severe", "severe") or g_level == "severe" or i_level == "severe":
+        assessment_risk = "high"
+    elif p_level in ("mild", "moderate") or g_level in ("mild", "moderate") or i_level in ("mild", "moderate"):
+        assessment_risk = "medium"
+    else:
+        assessment_risk = "low"
+    if item9 >= 2:
+        assessment_risk = "high"
+        assessment_emotion = "自伤风险"
+    elif assessment_risk == "high":
+        assessment_emotion = "重度心理困扰"
+    elif assessment_risk == "medium":
+        assessment_emotion = "情绪需关注"
+    else:
+        assessment_emotion = "正常"
+    try:
+        db.update_student_state_from_evidence(
+            student_id=student_pk,
+            risk_level=assessment_risk,
+            emotion_status=assessment_emotion,
+            source="assessment",
+            counselor_id=db.get_student_by_id(student_pk).get("counselor_id") if db.get_student_by_id(student_pk) else None,
+            description="测评结果已回写，请根据风险等级安排后续跟进。",
+        )
+    except Exception as exc:
+        logger.warning("测评状态回写失败: %s", exc)
 
     # 分级标签中文
     labels = {"none": "正常", "mild": "轻度", "moderate": "中度", "mod_severe": "中重度", "severe": "重度"}
