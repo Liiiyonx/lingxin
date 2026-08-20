@@ -1,176 +1,121 @@
-# 聆心 v3.0
+# 聆心 · 高校辅导员 AI 减负与心理预警一体化平台
 
-> **高校辅导员AI减负与心理预警一体化平台**
+> 面向高校辅导员、学工处与学生的多模态心理辅助平台。平台把「谈心记录、视频情绪识别、风险预警、危机工单、AI 数字人、预约咨询」串成一条可追溯的闭环，让每一次学生状态变化都有证据、有通知、有处置。
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-3.x-green.svg)](https://flask.palletsprojects.com)
-[![License](https://img.shields.io/badge/License-MIT-orange.svg)](#)
+## 核心功能
 
----
+| 模块 | 能力 |
+|---|---|
+| 情绪网络图 | 以辅导员或全校视角展示学生情绪风险分布，按风险/班级/学院聚类，点击节点直达学生聊天 |
+| 视频实时情绪 | 视频通话中融合微表情、语音韵律与后端模型，生成实时情绪和通话总结，并回写学生风险状态 |
+| 数字人 | 老师离线时由 AI 分身幽默、亲切地回复学生；支持危机识别、AI 身份标注、TTS 朗读、值班日志流转 |
+| 心理预警闭环 | 测评、谈心、视频、数字人、预警处置统一回写学生状态，取最高风险不降级，证据可溯源 |
+| 危机工单 | 学工处/管理员可查看、指派、关闭跨角色危机工单，关闭后自动重算学生风险 |
+| 知识库 | RAG 混合检索（向量 + BM25 + 新鲜度），文档上传/查看/删除 |
+| 预约咨询 | 学生预约、老师确认后自动生成待办，完成后沉淀谈心记录 |
+| 通讯与报告 | 师生消息、AI 谈心记录、班会策划、公文写作，Markdown 安全渲染与打印导出 |
 
-## ✨ v3.0 新特性
+## 技术架构
 
-- 🌙 **深色/浅色模式** - 支持一键切换深色和浅色主题，自动保存用户偏好
-- 🎨 **现代化UI** - 全新设计的界面，采用渐变色彩和圆润卡片设计
-- 📱 **响应式布局** - 适配不同屏幕尺寸，支持移动端访问
-- 🚀 **性能优化** - 优化前端渲染和API响应速度
+```mermaid
+flowchart TB
+    U[浏览器端 Vue 3 SPA] -->|REST / Socket.IO| F[Flask API]
+    F --> DB[(SQLite + SQLAlchemy)]
+    F --> AUTH[JWT 登录与角色权限]
+    F --> DH[AI 数字人]
+    F --> RAG[知识库 RAG]
+    F --> EMO[情绪引擎]
+    EMO --> SENSE[SenseVoice / emotion2vec]
+    EMO --> VISION[face-api / YOLO]
+    F --> LLM[DashScope / OpenAI]
+    U --> NET[ECharts 情绪网络图]
+    U --> RT[WebRTC 视频通话]
+```
 
----
+主要目录：
 
-## 项目简介
+```text
+api/routes.py              REST API、危机工单、Socket.IO 事件
+core/database.py           SQLAlchemy 模型、状态聚合、风险证据
+core/digital_human.py      数字人回复与危机识别
+core/emotion_engine.py     语音情绪识别
+core/rag_engine.py         知识库检索
+static/js/app.js           前端主应用
+static/js/network-graph.js 情绪网络图
+static/js/realtime/*        实时情绪检测与融合
+templates/index.html       Vue 3 单页界面
+```
 
-**聆心** 是面向高校辅导员的 AI 辅助工作平台，基于 RAG 检索增强生成、语音情绪识别、多场景提示词工程等技术，为辅导员日常工作提供智能化支持。
+## 快速开始
 
-### 核心功能
+### Windows 一键启动
 
-| 功能 | 说明 | 技术实现 |
-|------|------|---------|
-| **AI 谈心助手** | 自动生成结构化谈心记录，支持多种工作场景 | 多场景 Prompt |
-| **语音情绪识别** | 上传音频自动识别学生情绪状态 | emotion2vec 模型 + 声学特征降级 |
-| **RAG 知识库** | 基于学校规章制度文档的智能问答 | ChromaDB + BM25 混合检索 |
-| **风险预警系统** | 自动识别高风险学生并生成预警 | 规则引擎 + AI 分析 |
-| **数据可视化** | 情绪趋势、风险分布、工作统计等图表 | ECharts 可视化 |
-| **权限管理** | 三级角色权限控制：管理员/学工/辅导员 | JWT 认证 |
-| **深色模式** | 支持深色/浅色主题切换 | CSS变量 + localStorage |
+双击 `演示一键启动.bat`，脚本会检查 Python/依赖、初始化数据库、必要时生成确定性演示数据，并打印访问地址和测试账号。
 
----
+也可以使用原有入口 `启动平台.bat`。
 
-## 🚀 快速开始
-
-### 环境要求
-
-- Python 3.10+
-- Node.js（仅开发环境需要）
-- 有效的 DashScope API Key
-
-### 安装步骤
+### Linux / macOS
 
 ```bash
-# 1. 克隆项目
-git clone <repo-url>
-cd 聆心-代码文件
+chmod +x run_demo.sh
+./run_demo.sh
+```
 
-# 2. 创建虚拟环境
+### 手动启动
+
+```bash
 python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Mac/Linux
+# Windows
+venv\Scripts\activate
+# macOS/Linux
+source venv/bin/activate
 
-# 3. 安装依赖
 pip install -r requirements.txt
-
-# 4. 配置环境变量
-copy .env.example .env
-# 编辑 .env 文件配置 DASHSCOPE_API_KEY
-
-# 5. 启动服务
+copy .env.example .env   # 按需填写 DASHSCOPE_API_KEY
 python app.py
 ```
 
-访问 http://localhost:5000
+访问 `http://127.0.0.1:5000`。
 
-### Windows 快捷启动
+## 测试账号
 
-双击 `启动平台.bat` 即可一键启动，自动检测环境并运行服务。
+种子数据为确定性数据，每名辅导员固定 50 名学生。角色和示例账号如下：
 
----
+| 角色 | 账号 | 密码 |
+|---|---|---|
+| 超级管理员 | `admin` | `admin123` |
+| 学工处 | `liuxin` | `staff123` |
+| 学工处 | `student_affairs` | `staff123` |
+| 辅导员 | `zhangwei`、`liuqiang`、`wangli`、`zhaolei`、`chenjing`、`yangfan`、`huangwei`、`zhoujie`、`sunpeng`、`wuxiaolin`、`zhengyu`、`tangli` | `counsel123` |
+| 学生 | `20240001` 等，具体账号由 `seed_v31.py` 输出 | `123456` |
 
-## 🔑 测试账号
+登录页会通过 `/system/test-accounts` 动态拉取完整账号，不依赖前端硬编码。
 
-| 角色 | 用户名 | 密码 | 权限范围 |
-|------|--------|------|---------|
-| 超级管理员 | admin | admin123 | 全部功能 |
-| 学工处 | liuxin | staff123 | 学生管理+预警 |
-| 辅导员 | zhangwei | counsel123 | 个人学生管理 |
+## 测试与验证
 
----
-
-## 📁 项目结构
-
-```
-聆心-代码文件/
-├── app.py                 # Flask 应用入口
-├── config/
-│   └── config.py          # 统一配置模块
-├── core/
-│   ├── database.py        # 数据库模型与管理
-│   ├── emotion_engine.py  # 情绪识别引擎
-│   ├── prompt_engine.py   # 提示词工程引擎
-│   └── rag_engine.py      # RAG 知识库引擎
-├── api/
-│   └── routes.py          # RESTful API 路由
-├── templates/
-│   └── index.html         # 前端单页应用（Vue 3 SPA）
-├── static/                # 静态资源
-├── data/                  # 数据库与向量库
-├── docs/                  # 文档资料
-├── requirements.txt       # Python 依赖
-├── .env.example           # 环境变量模板
-└── 启动平台.bat            # Windows 启动脚本
+```bash
+python -m pytest tests/ -q
+python scripts/verify_test_accounts.py
+python scripts/smoke_frontend.py
 ```
 
----
+当前测试覆盖：
 
-## 🎯 技术架构
+- 核心闭环：测评 high -> 谈心 medium -> 风险仍为 high -> 预警解决后重算；
+- 数字人危机识别、AI 回复落库与预警生成；
+- 预警状态机、危机工单指派与关闭；
+- 测评边界、预约联动、权限隔离、风险证据时间线；
+- 路由与前端页面冒烟。
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                前端 (Vue 3 + ECharts)                       │
-├─────────────────────────────────────────────────────────────┤
-│              Flask RESTful API Layer                         │
-├─────────────────────────────────────────────────────────────┤
-│  Prompt    │  Emotion   │  RAG        │  Database           │
-│  Engine    │  Engine    │  Engine     │  Manager            │
-├─────────────────────────────────────────────────────────────┤
-│  DashScope │ SenseVoice │ ChromaDB    │ SQLite/SQLAlchemy   │
-└─────────────────────────────────────────────────────────────┘
-```
+## 安全说明
 
----
+- Markdown 统一通过 `DOMPurify.sanitize(marked.parse(...))` 后再渲染；
+- 密码使用 Werkzeug 哈希存储；
+- `.env`、`data/*.db`、模型文件已加入 `.gitignore`；
+- 关键 API 请求失败会触发前端 Toast，不再静默吞错。
 
-## 📊 API 文档
+## 更新记录
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/auth/login` | 用户登录 |
-| GET | `/api/system/dashboard` | 仪表盘数据 |
-| POST | `/api/conversation/organize` | AI整理谈心记录 |
-| POST | `/api/conversation/recognize-image` | 截图识别 |
-| POST | `/api/emotion/analyze` | 语音情绪分析 |
-| GET | `/api/emotion/logs` | 情绪日志查询 |
-| GET | `/api/alert/list` | 预警列表 |
-| PUT | `/api/alert/:id/acknowledge` | 确认预警 |
-| GET | `/api/knowledge/stats` | 知识库统计 |
-| POST | `/api/knowledge/upload` | 上传知识文档 |
-| POST | `/api/system/export` | 数据导出 |
-
----
-
-## 🛠️ 核心技术
-
-1. **多场景提示词引擎** - 谈心记录 + 班会策划 + 公文写作等多场景模板
-2. **混合RAG检索** - 向量检索 + BM25关键词检索 + 时间新鲜度加权
-3. **智能 AI 对话** - 基于大语言模型的自然语言处理，场景化 Prompt 管理
-4. **语音情绪识别** - 真实开源模型（emotion2vec）本地推理，模型不可用时自动降级为声学特征 + LLM 研判，支持批量处理
-5. **数据可视化** - ECharts 图表展示情绪趋势、风险分布等
-
----
-
-## 📝 更新日志
-
-### v3.0 (2026-07)
-- ✨ 新增深色/浅色模式切换
-- 🎨 全新现代化UI设计
-- 📱 响应式布局优化
-- 🚀 性能优化与bug修复
-
-### v2.0
-- 🎤 语音情绪识别功能
-- 📚 RAG知识库系统
-- 🚨 风险预警系统
-- 📊 数据可视化看板
-
----
-
-## License
-
-MIT
+- `v3.2`：AI 数字人、危机工单、风险证据时间线、预约闭环、XSS 防护、测试补齐；
+- `v3.1`：情绪网络图、实时情绪融合、在线状态；
+- `v3.0`：深色模式、现代化 UI、响应式布局。
