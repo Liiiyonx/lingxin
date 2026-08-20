@@ -1,6 +1,7 @@
 ﻿import os
 import sys
 import logging
+import re
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 if ROOT_DIR not in sys.path:
@@ -127,23 +128,37 @@ def create_app():
     except Exception as e:
         logger.warning(f"Database init skipped: {e}")
 
+    def render_index_html():
+        index_path = os.path.join(app.template_folder, "index.html")
+        with open(index_path, encoding="utf-8") as f:
+            html = f.read()
+
+        partial_dir = os.path.abspath(os.path.join(app.template_folder, "partials"))
+        include_re = re.compile(r"<!-- INCLUDE:partials/([A-Za-z0-9_\-]+\.html) -->")
+
+        def include_file(match):
+            name = match.group(1)
+            partial_path = os.path.abspath(os.path.join(partial_dir, name))
+            if not partial_path.startswith(partial_dir + os.sep):
+                logger.warning("Blocked unsafe partial include: %s", name)
+                return match.group(0)
+            try:
+                with open(partial_path, encoding="utf-8") as pf:
+                    return pf.read()
+            except FileNotFoundError:
+                logger.warning("Missing partial template: %s", name)
+                return match.group(0)
+
+        return include_re.sub(include_file, html)
+
     @app.route("/")
     def index():
-        index_path = os.path.join(app.template_folder, "index.html")
-        if os.path.exists(index_path):
-            with open(index_path, "rb") as f:
-                html_bytes = f.read()
-            resp = Response(html_bytes, content_type="text/html; charset=utf-8")
-            resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-            resp.headers["Pragma"] = "no-cache"
-            resp.headers["Expires"] = "0"
-            return resp
-        return jsonify({
-            "name": ApplicationConfig.APP_NAME,
-            "version": ApplicationConfig.VERSION,
-            "status": "running",
-            "message": "Backend running, visit /api for docs."
-        })
+        html = render_index_html()
+        resp = Response(html.encode("utf-8"), content_type="text/html; charset=utf-8")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
 
     @app.route("/favicon.ico")
     def favicon():
@@ -171,11 +186,9 @@ def create_app():
         # 只对浏览器页面请求返回 index.html
         accept = request.headers.get("Accept", "")
         if "text/html" in accept:
-            index_path = os.path.join(app.template_folder, "index.html")
             try:
-                with open(index_path, "rb") as f:
-                    html_bytes = f.read()
-                return Response(html_bytes, content_type="text/html; charset=utf-8")
+                html = render_index_html()
+                return Response(html.encode("utf-8"), content_type="text/html; charset=utf-8")
             except FileNotFoundError:
                 return jsonify({"error": "Page not found", "code": 404}), 404
         return jsonify({"error": "Not found", "code": 404}), 404
