@@ -85,6 +85,27 @@
         .guidance-script-text{flex:1;line-height:1.6;font-size:13px}
         .guidance-fill-btn{flex-shrink:0;padding:3px 10px;border-radius:8px;border:none;background:var(--brand-gradient,linear-gradient(135deg,#6366f1,#8b5cf6));color:#fff;font-size:12px;cursor:pointer;transition:all .15s}
         .guidance-fill-btn:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(99,102,241,.35)}
+        .dh-voice-btn{margin-left:auto}
+        @media(max-width:768px){
+            .network-canvas-wrap{height:calc(100vh - 286px);min-height:320px}
+            .network-filter-bar{gap:6px;padding:8px 10px}
+            .network-search-box{width:100%;min-width:0;margin-top:2px}
+            .network-search-box input{flex:1;width:100%;min-width:0}
+            .network-zoom-ctrl{margin-left:0}
+            .network-footbar{gap:8px;font-size:11px;line-height:1.5}
+            .network-footbar .ml-auto{width:100%;margin-left:0}
+            .dh-hero{flex-direction:column;align-items:flex-start;gap:16px;padding:18px}
+            .dh-avatar{width:72px;height:72px;border-radius:22px;font-size:40px}
+            .dh-avatar .dh-ring{inset:-6px;border-radius:26px}
+            .dh-hero .flex-1{width:100%}
+            .dh-hero .flex.items-center.gap-3.mt-3{flex-wrap:wrap;gap:10px}
+            .dh-voice-btn{margin-left:0;width:100%;justify-content:center}
+        }
+        @media(max-width:480px){
+            .network-canvas-wrap{height:calc(100vh - 316px);min-height:280px}
+            .network-filter-chip{padding:5px 9px;font-size:11px}
+            .network-mode-switch button{padding:5px 9px}
+        }
     </style>
 </head>
 <body>
@@ -401,7 +422,7 @@
                 <!-- ══════ 师生对话 ══════ -->
                 <div v-if="page==='teacherChat'" class="fade-in">
                     <div class="card card-flush">
-                        <div class="chat-layout" style="height:calc(100vh - 150px)">
+                        <div class="chat-layout">
                             <!-- 左侧联系人 -->
                             <div class="chat-sidebar">
                                 <div class="p-4 font-bold text-base border-b">💬 师生对话</div>
@@ -556,7 +577,7 @@
                             <div class="flex items-center gap-3 mt-3">
                                 <button class="dh-toggle" :class="{on:dhSettings.enabled}" @click="dhSettings.enabled=!dhSettings.enabled;saveDigitalHuman()"></button>
                                 <span class="text-sm font-semibold">{{ dhSettings.enabled ? '数字人已开启' : '数字人已关闭' }}</span>
-                                <button class="btn btn-sm" style="margin-left:auto;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.34)" @click="dhVoiceEnabled=!dhVoiceEnabled" :title="dhVoiceEnabled?'关闭自动朗读':'开启自动朗读'">{{ dhVoiceEnabled ? '🔊 自动朗读已开' : '🔈 自动朗读已关' }}</button>
+                                <button class="btn btn-sm dh-voice-btn" style="background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.34)" @click="dhVoiceEnabled=!dhVoiceEnabled" :title="dhVoiceEnabled?'关闭自动朗读':'开启自动朗读'">{{ dhVoiceEnabled ? '🔊 自动朗读已开' : '🔈 自动朗读已关' }}</button>
                             </div>
                         </div>
                     </div>

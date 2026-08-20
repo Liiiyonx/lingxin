@@ -30,7 +30,7 @@
 
                 <!-- 学生联系老师 -->
                 <div v-if="page==='studentChat'" class="fade-in">
-                    <div class="card card-flush"><div class="chat-layout" style="height:calc(100vh - 150px)">
+                    <div class="card card-flush"><div class="chat-layout">
                         <div class="chat-sidebar"><div class="p-4 font-bold text-base border-b">💬 消息</div>
                             <div v-for="contact in messageContacts" :key="contact.id" @click="selectContactHandler(contact)" class="flex items-center gap-3 p-3 cursor-pointer border-b border-light transition" :class="{'bg-brand-50':selectedContact&&selectedContact.id===contact.id}"><div class="avatar">{{ contact.name[0] }}</div><div class="flex-1 min-w-0"><div class="flex justify-between items-center"><span class="font-semibold text-sm">{{ contact.name }}老师</span><span v-if="contact.unread_count" class="badge badge-danger badge-sm">{{ contact.unread_count }}</span></div><div v-if="contact.last_message" class="text-xs text-muted mt-1 truncate">{{ contact.last_message.content }}</div></div></div>
                             <div v-if="!messageContacts.length" class="empty-state p-8">暂无消息</div></div>
