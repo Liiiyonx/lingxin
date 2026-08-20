@@ -6,6 +6,28 @@ window.API = (function() {
   const BASE = location.origin + '/api';
   let token = localStorage.getItem('token') || '';
 
+  const CRITICAL_PATH_MATCHERS = [
+    function(p) { return p.indexOf('/messages/send') !== -1; },
+    function(p) { return p.indexOf('generate-report') !== -1; },
+    function(p) { return p.indexOf('crisis/report') !== -1; },
+    function(p) { return p.indexOf('assessment/submit') !== -1; },
+  ];
+
+  function isCriticalApi(path) {
+    return CRITICAL_PATH_MATCHERS.some(function(match) { return match(path); });
+  }
+
+  function reportCriticalFailure(path, message, retry) {
+    if (isCriticalApi(path)) {
+      console.error('[API] critical operation failed:', path, message);
+      emitter.emit('critical-error', {
+        path: path,
+        message: message,
+        retry: retry
+      });
+    }
+  }
+
   const emitter = { _handlers: {} };
   emitter.on = function(ev, fn) { (this._handlers[ev] = this._handlers[ev] || []).push(fn); };
   emitter.emit = function(ev, data) { (this._handlers[ev] || []).forEach(function(fn) { fn(data); }); };
@@ -20,8 +42,8 @@ window.API = (function() {
     try {
       res = await fetch(BASE + path, Object.assign({}, opts, { headers: headers }));
     } catch (e) {
-      const msg = '网络连接失败，请检查网络';
-      emitter.emit('error', msg);
+      const msg = '网络连接失败，请检查网络后重试';
+      reportCriticalFailure(path, msg, function() { return request(path, opts); });
       throw new Error(msg);
     }
 
@@ -35,7 +57,7 @@ window.API = (function() {
 
     if (!res.ok) {
       var msg = (data && data.message) ? data.message : ('请求失败 (HTTP ' + res.status + ')');
-      emitter.emit('error', msg);
+      reportCriticalFailure(path, msg, function() { return request(path, opts); });
       throw new Error(msg);
     }
 
@@ -76,7 +98,6 @@ window.API = (function() {
         if (r.status === 401) { emitter.emit('unauthorized'); throw new Error('unauthorized'); }
         return r.json();
       } catch (e) {
-        emitter.emit('error', e.message);
         throw e;
       }
     },

@@ -13,20 +13,54 @@ window.Helpers = {
   // 风险背景色
   riskBg: function(l) { return { high:'#ef4444', medium:'#f59e0b', low:'#10b981', none:'#94a3b8' }[l] || '#94a3b8'; },
   // 风险标签
-  riskLbl: function(l) { return { high:'高风险', medium:'中风险', low:'低风险', none:'正常' }[l] || l; },
+  riskLbl: function(l) {
+    return { high:'高风险', medium:'中风险', low:'低风险', none:'正常', critical:'危急风险' }[l] || l;
+  },
+  escapeHtml: function(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  },
   // Markdown渲染
   renderMd: function(text) {
     if (!text) return '';
-    if (typeof marked !== 'undefined' && marked && marked.parse) {
-      try { return marked.parse(text); } catch(e) {}
+    if (typeof marked !== 'undefined' && marked && marked.parse && typeof DOMPurify !== 'undefined' && DOMPurify) {
+      try {
+        var html = marked.parse(text);
+        return DOMPurify.sanitize(html);
+      } catch(e) {}
     }
-    return text.replace(/\n/g, '<br>');
+    return this.escapeHtml(text).replace(/\n/g, '<br>');
   },
   // 时间格式化
   formatTime: function(ts) {
     if (!ts) return '';
     var d = new Date(ts);
     return ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+  },
+  formatDateTime: function(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  },
+  sourceLbl: function(source) {
+    return {
+      assessment: '心理测评',
+      talk_report: '谈心记录',
+      video_call_summary: '视频通话',
+      digital_human: '数字人对话',
+      alert_resolution: '预警处置',
+      manual: '人工调整',
+      reminder_done: '提醒完成',
+      todo_done: '待办完成',
+      legacy_update: '旧接口回写',
+      unknown: '系统',
+    }[source] || source || '系统';
   },
   // 防抖
   debounce: function(fn, delay) {

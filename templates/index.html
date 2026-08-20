@@ -20,6 +20,60 @@
         .network-filter-chip:hover{transform:translateY(-1px)}
         .network-canvas-wrap{height:calc(100vh - 220px);min-height:420px;width:100%}
         .network-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted,#94a3b8);font-size:14px;pointer-events:none}
+        .network-mode-switch{display:inline-flex;background:var(--bg-tertiary,#f1f5f9);border-radius:10px;padding:3px;gap:2px}
+        .network-mode-switch button{padding:5px 14px;border:none;border-radius:8px;background:transparent;font-size:12px;cursor:pointer;color:var(--text-secondary,#64748b);transition:all .18s;font-weight:500}
+        .network-mode-switch button.active{background:var(--bg-secondary,#fff);color:var(--brand-600,#4f46e5);box-shadow:0 1px 4px rgba(15,23,42,.12);font-weight:600}
+        .network-search-box{display:inline-flex;align-items:center;gap:4px}
+        .network-search-box input{padding:5px 10px;border:1px solid var(--border-color,#e2e8f0);border-radius:14px;background:var(--bg-secondary,#fff);font-size:12px;width:160px;outline:none;transition:border-color .15s;color:var(--text-primary,#0f172a)}
+        .network-search-box input:focus{border-color:var(--brand-500,#6366f1)}
+        .network-search-box button{border:none;background:var(--brand-500,#6366f1);color:#fff;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1}
+        .network-zoom-ctrl{display:inline-flex;gap:4px}
+        .network-zoom-ctrl button{width:26px;height:26px;border-radius:8px;border:1px solid var(--border-color,#e2e8f0);background:var(--bg-secondary,#fff);cursor:pointer;font-size:14px;color:var(--text-secondary,#64748b);transition:all .15s;line-height:1}
+        .network-zoom-ctrl button:hover{border-color:var(--brand-500,#6366f1);color:var(--brand-600,#4f46e5);transform:translateY(-1px)}
+        .network-tip{position:absolute;z-index:20;pointer-events:none;min-width:180px;max-width:240px;padding:10px 12px;border-radius:12px;background:var(--bg-secondary,#fff);border:1px solid var(--border-color,#e2e8f0);box-shadow:0 10px 30px rgba(15,23,42,.16);font-size:12px;animation:netTipIn .16s ease-out}
+        @keyframes netTipIn{from{opacity:0;transform:translateY(4px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+        .network-tip-title{font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px;margin-bottom:4px;color:var(--text-primary,#0f172a)}
+        .network-tip-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+        .network-tip-no{font-weight:400;color:var(--text-muted,#94a3b8);font-size:11px}
+        .network-tip-row{color:var(--text-secondary,#64748b);margin-top:3px;display:flex;align-items:center;gap:6px}
+        .network-tip-go{color:var(--brand-600,#4f46e5);font-weight:600;margin-left:auto}
+        .network-footbar{display:flex;align-items:center;gap:14px;padding:8px 16px;border-top:1px solid var(--border-color,#e2e8f0);flex-wrap:wrap}
+        /* 数字人 AI 分身 */
+        .dh-hero{display:flex;gap:24px;align-items:center;padding:22px 24px;border-radius:16px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 55%,#a855f7 100%);color:#fff;position:relative;overflow:hidden}
+        .dh-hero::before,.dh-hero::after{content:'';position:absolute;border-radius:50%;background:rgba(255,255,255,.08)}
+        .dh-hero::before{width:180px;height:180px;right:-40px;top:-60px}
+        .dh-hero::after{width:120px;height:120px;right:80px;bottom:-50px}
+        .dh-avatar{width:92px;height:92px;border-radius:28px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;flex-shrink:0;animation:dhFloat 3.2s ease-in-out infinite}
+        @keyframes dhFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+        .dh-avatar .dh-ring{position:absolute;inset:-7px;border-radius:32px;border:2px dashed rgba(255,255,255,.45);animation:dhSpin 12s linear infinite}
+        @keyframes dhSpin{to{transform:rotate(360deg)}}
+        .dh-status-dot{position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;border:3px solid #8b5cf6;background:#10b981}
+        .dh-status-dot.off{background:#94a3b8}
+        .dh-toggle{position:relative;width:46px;height:26px;border-radius:13px;border:none;cursor:pointer;background:rgba(255,255,255,.3);transition:background .2s;flex-shrink:0}
+        .dh-toggle::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
+        .dh-toggle.on{background:#10b981}
+        .dh-toggle.on::after{left:23px}
+        .dh-log-item{display:flex;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg-tertiary,#f1f5f9);margin-bottom:8px;font-size:13px}
+        .dh-log-ai{width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+        .dh-preview-bubble{max-width:85%;padding:10px 14px;border-radius:14px;border-top-left-radius:4px;background:var(--bg-secondary,#fff);border:1px solid var(--border-color,#e2e8f0);font-size:13px;line-height:1.7;box-shadow:0 2px 8px rgba(15,23,42,.06)}
+        .ai-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px}
+        .bubble.bubble-ai{background:linear-gradient(135deg,#eef2ff,#f5f3ff)!important;border:1px solid #c7d2fe!important}
+        .msg-speak-btn{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;margin-left:6px;border:none;border-radius:7px;background:rgba(99,102,241,.12);color:#6366f1;cursor:pointer;font-size:12px;line-height:1;vertical-align:-4px;transition:background .18s,color .18s,transform .18s}
+        .msg-speak-btn:hover{background:#6366f1;color:#fff;transform:translateY(-1px)}
+        .ai-typing-avatar{animation:aiAvatarPulse 1.1s ease-in-out infinite}
+        @keyframes aiAvatarPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+        .ai-typing-bubble{display:inline-flex;align-items:center;gap:9px;padding-top:10px;padding-bottom:10px}
+        .typing-dots{display:inline-flex;align-items:center;gap:4px}
+        .typing-dots i{width:6px;height:6px;border-radius:50%;background:#6366f1;display:inline-block;animation:typingBlink 1.2s infinite}
+        .typing-dots i:nth-child(2){animation-delay:.15s}
+        .typing-dots i:nth-child(3){animation-delay:.3s}
+        @keyframes typingBlink{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+        .chat-online-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+        .chat-online-pill.online{background:#dcfce7;color:#16a34a}
+        .chat-online-pill.ai{background:#eef2ff;color:#4f46e5}
+        .chat-online-pill i{width:7px;height:7px;border-radius:50%;display:inline-block}
+        .chat-online-pill.online i{background:#22c55e;animation:pulseDot 1.6s infinite}
+        .chat-online-pill.ai i{background:#6366f1}
         /* AI 话术推荐 */
         .guidance-risk-tag{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600}
         .guidance-category{margin-bottom:12px;padding:10px 12px;border-radius:10px;background:var(--bg-tertiary,#f1f5f9);border-left:3px solid var(--gc,#6366f1)}
@@ -130,12 +184,13 @@
                         <div class="nav-section-title">监测中心</div>
                         <div class="nav-item" :class="{active:page==='emotionBoard'}" @click="page='emotionBoard';loadEmotionDashboard()" data-tooltip="情绪看板"><span class="nav-item-icon" v-html="Icons.render('chart')"></span><span class="nav-item-text">全校情绪看板</span></div>
                         <div class="nav-item" :class="{active:page==='emotionNetwork'}" @click="page='emotionNetwork';loadEmotionNetwork()" data-tooltip="情绪网络图"><span class="nav-item-icon" v-html="Icons.render('network')"></span><span class="nav-item-text">全校情绪网络图</span></div>
-                        <div class="nav-item" :class="{active:page==='alerts'}" @click="page='alerts';loadAlerts()" data-tooltip="风险预警"><span class="nav-item-icon" v-html="Icons.render('alert')"></span><span class="nav-item-text">全校风险预警</span><span class="nav-badge" v-if="alerts.filter(function(a){return a.status==='pending'}).length">{{ alerts.filter(function(a){return a.status==='pending'}).length }}</span></div>
+                        <div class="nav-item" :class="{active:page==='alerts'&&!crisisOnly}" @click="page='alerts';crisisOnly=false;loadAlerts()" data-tooltip="风险预警"><span class="nav-item-icon" v-html="Icons.render('alert')"></span><span class="nav-item-text">全校风险预警</span><span class="nav-badge" v-if="alerts.filter(function(a){return a.status==='pending'}).length">{{ alerts.filter(function(a){return a.status==='pending'}).length }}</span></div>
+                        <div class="nav-item" :class="{active:page==='alerts'&&crisisOnly}" @click="page='alerts';crisisOnly=true;loadAlerts()" data-tooltip="危机处置中心"><span class="nav-item-icon" v-html="Icons.render('shield')"></span><span class="nav-item-text">危机处置中心</span></div>
                     </div>
                     <div class="nav-section">
                         <div class="nav-section-title">管理</div>
                         <div class="nav-item" :class="{active:page==='students'}" @click="page='students';loadStudents()" data-tooltip="学生管理"><span class="nav-item-icon" v-html="Icons.render('students')"></span><span class="nav-item-text">全校学生管理</span></div>
-                        <div class="nav-item" :class="{active:page==='knowledge'}" @click="page='knowledge';loadKbStats()" data-tooltip="知识库"><span class="nav-item-icon" v-html="Icons.render('knowledge')"></span><span class="nav-item-text">知识库管理</span></div>
+                        <div class="nav-item" :class="{active:page==='knowledge'}" @click="page='knowledge'" data-tooltip="知识库"><span class="nav-item-icon" v-html="Icons.render('knowledge')"></span><span class="nav-item-text">知识库管理</span></div>
                     </div>
                     <div class="nav-section">
                         <div class="nav-section-title">系统</div>
@@ -153,6 +208,8 @@
                     <div class="nav-section">
                         <div class="nav-section-title">沟通</div>
                         <div class="nav-item" :class="{active:page==='teacherChat'}" @click="page='teacherChat';loadMessageContacts()" data-tooltip="师生对话"><span class="nav-item-icon" v-html="Icons.render('chat')"></span><span class="nav-item-text">师生对话</span><span class="nav-badge" v-if="teacherUnreadCount">{{ teacherUnreadCount }}</span></div>
+                        <div class="nav-item" :class="{active:page==='teacherAppointments'}" @click="page='teacherAppointments';loadAppointments()" data-tooltip="预约管理"><span class="nav-item-icon" v-html="Icons.render('calendar')"></span><span class="nav-item-text">预约管理</span><span class="nav-badge" v-if="appointments.filter(function(a){return a.status==='pending'}).length">{{ appointments.filter(function(a){return a.status==='pending'}).length }}</span></div>
+                        <div class="nav-item" :class="{active:page==='digitalHuman'}" @click="page='digitalHuman';loadDigitalHuman()" data-tooltip="AI 数字人"><span class="nav-item-icon" v-html="Icons.render('sparkles')"></span><span class="nav-item-text">AI 数字人</span><span class="nav-badge" v-if="dhSettings.enabled" style="background:linear-gradient(135deg,#6366f1,#a855f7)">ON</span></div>
                     </div>
                     <div class="nav-section">
                         <div class="nav-section-title">工具</div>
@@ -164,7 +221,7 @@
                         <div class="nav-section-title">管理</div>
                         <div class="nav-item" :class="{active:page==='alerts'}" @click="page='alerts';loadAlerts()" data-tooltip="风险预警"><span class="nav-item-icon" v-html="Icons.render('alert')"></span><span class="nav-item-text">本班风险预警</span><span class="nav-badge" v-if="alerts.filter(function(a){return a.status==='pending'}).length">{{ alerts.filter(function(a){return a.status==='pending'}).length }}</span></div>
                         <div class="nav-item" :class="{active:page==='students'}" @click="page='students';loadStudents()" data-tooltip="学生管理"><span class="nav-item-icon" v-html="Icons.render('students')"></span><span class="nav-item-text">本班学生管理</span></div>
-                        <div class="nav-item" :class="{active:page==='knowledge'}" @click="page='knowledge';loadKbStats()" data-tooltip="知识库"><span class="nav-item-icon" v-html="Icons.render('knowledge')"></span><span class="nav-item-text">知识库</span></div>
+                        <div class="nav-item" :class="{active:page==='knowledge'}" @click="page='knowledge'" data-tooltip="知识库"><span class="nav-item-icon" v-html="Icons.render('knowledge')"></span><span class="nav-item-text">知识库</span></div>
                     </div>
                     <div class="nav-section">
                         <div class="nav-section-title">系统</div>
@@ -275,27 +332,68 @@
                 <!-- ══════ 情绪网络图 ══════ -->
                 <div v-if="page==='emotionNetwork'" class="fade-in">
                     <div class="page-header">
-                        <div><h3>情绪网络图</h3><p class="text-muted text-sm mt-1">{{ networkGraph.root ? networkGraph.root.name + ' · 学生情绪全景 · ' + networkGraph.root.total + ' 名学生' : '加载中...' }}<span v-if="networkGraph.updated_at" class="text-muted"> · 更新于 {{ networkGraph.updated_at }}</span></p></div>
+                        <div><h3>情绪网络图</h3><p class="text-muted text-sm mt-1">{{ networkGraph && networkGraph.root ? networkGraph.root.name + ' · ' + (networkFollowUp ? '待跟进学生' : '学生情绪全景') + ' · ' + networkVisibleCount + ' 名学生在图' : '加载中...' }}<span v-if="networkGraph && networkGraph.updated_at" class="text-muted"> · 更新于 {{ networkGraph.updated_at }}</span></p></div>
                         <div class="flex gap-2 items-center">
-                            <div class="network-legend">
-                                <span class="network-legend-item"><i style="background:#ef4444"></i>高风险</span>
-                                <span class="network-legend-item"><i style="background:#f59e0b"></i>中风险</span>
-                                <span class="network-legend-item"><i style="background:#10b981"></i>低风险</span>
+                            <div class="network-mode-switch">
+                                <button :class="{active:!networkFollowUp}" @click="setNetworkFollowUp(false)">🌐 情绪全景</button>
+                                <button :class="{active:networkFollowUp}" @click="setNetworkFollowUp(true)">🎯 待跟进 <b v-if="networkGraph && networkGraph.stats">{{ (networkGraph.stats.high||0) + (networkGraph.stats.medium||0) }}</b></button>
+                            </div>
+                            <div class="network-mode-switch" title="节点聚合方式">
+                                <button :class="{active:networkClusterMode==='auto'}" @click="setNetworkClusterMode('auto')">自动</button>
+                                <button :class="{active:networkClusterMode==='force'}" @click="setNetworkClusterMode('force')">聚合</button>
+                                <button :class="{active:networkClusterMode==='off'}" @click="setNetworkClusterMode('off')">逐生</button>
+                            </div>
+                            <div class="network-mode-switch" title="聚合维度">
+                                <button :class="{active:networkClusterBy==='class'}" @click="setNetworkClusterBy('class')">班级</button>
+                                <button :class="{active:networkClusterBy==='college'}" @click="setNetworkClusterBy('college')">学院</button>
                             </div>
                             <button class="btn btn-outline btn-sm" @click="loadEmotionNetwork()">🔄 刷新</button>
                         </div>
                     </div>
                     <div class="card m-0" style="padding:0">
                         <div class="network-filter-bar">
-                            <span class="text-sm text-muted font-semibold">严重程度：</span>
-                            <button class="network-filter-chip" :class="{active:networkFilter.includes('high')}" @click="toggleNetworkFilter('high')">🔴 高风险 <b>{{ networkGraph.stats ? networkGraph.stats.high : 0 }}</b></button>
-                            <button class="network-filter-chip" :class="{active:networkFilter.includes('medium')}" @click="toggleNetworkFilter('medium')">🟠 中风险 <b>{{ networkGraph.stats ? networkGraph.stats.medium : 0 }}</b></button>
-                            <button class="network-filter-chip" :class="{active:networkFilter.includes('low')}" @click="toggleNetworkFilter('low')">🟢 低风险 <b>{{ networkGraph.stats ? networkGraph.stats.low : 0 }}</b></button>
-                            <span class="ml-auto text-xs text-muted">🖱 拖拽节点 · 点击学生跳转对话 · 视频通话后自动更新</span>
+                            <button class="network-filter-chip" :class="{active:networkFilter.includes('high')}" @click="toggleNetworkFilter('high')">🔴 高风险 <b>{{ networkGraph && networkGraph.stats ? networkGraph.stats.high : 0 }}</b></button>
+                            <button class="network-filter-chip" :class="{active:networkFilter.includes('medium')}" @click="toggleNetworkFilter('medium')">🟠 中风险 <b>{{ networkGraph && networkGraph.stats ? networkGraph.stats.medium : 0 }}</b></button>
+                            <button class="network-filter-chip" :class="{active:networkFilter.includes('low')}" @click="toggleNetworkFilter('low')" :disabled="networkFollowUp" :style="{opacity:networkFollowUp?0.4:1}">🟢 低风险 <b>{{ networkGraph && networkGraph.stats ? networkGraph.stats.low : 0 }}</b></button>
+                            <div class="network-search-box">
+                                <input v-model="networkSearch" @input="onNetworkSearchInput" @keyup.enter="locateNetworkStudent" placeholder="搜索学生姓名/学号...">
+                                <button v-if="networkSearch" @click="locateNetworkStudent" title="定位学生">🎯</button>
+                            </div>
+                            <div class="network-zoom-ctrl ml-auto">
+                                <button @click="networkZoom('out')" title="缩小">−</button>
+                                <button @click="networkZoom('reset')" title="复位视图">⤾</button>
+                                <button @click="networkZoom('in')" title="放大">＋</button>
+                            </div>
                         </div>
                         <div class="network-canvas-wrap" style="position:relative">
                             <canvas ref="networkCanvas" style="width:100%;height:100%"></canvas>
-                            <div v-if="!networkGraph.groups || !networkGraph.groups.length" class="network-empty">暂无学生数据</div>
+                            <!-- 悬浮信息卡片 -->
+                            <div v-if="networkHover" class="network-tip" :style="networkTipStyle">
+                                <template v-if="networkHover.node.kind==='student'">
+                                    <div class="network-tip-title"><span class="network-tip-dot" :style="{background:networkHover.riskColor}"></span>{{ networkHover.node.name }} <span class="network-tip-no">#{{ networkHover.node.student_no }}</span></div>
+                                    <div class="network-tip-row">{{ networkHover.node.class_name || '未分班' }} · {{ networkHover.node._parent.kind === 'cluster' ? networkHover.node._parent._parent.emotion : networkHover.node._parent.emotion }}</div>
+                                    <div class="network-tip-row"><span class="badge" :class="'badge-' + ({high:'danger',medium:'warning',low:'success'}[networkHover.node.risk])">{{ networkHover.riskLabel }}</span><span class="network-tip-go">点击进入对话 →</span></div>
+                                </template>
+                                <template v-else-if="networkHover.node.kind==='cluster'">
+                                    <div class="network-tip-title">🏫 {{ networkHover.node.label }} <span class="network-tip-no">{{ networkHover.node.count }} 人</span></div>
+                                    <div class="network-tip-row">🔴 {{ networkHover.node.high }} 高 · 🟠 {{ networkHover.node.medium }} 中 · 🟢 {{ networkHover.node.low }} 低</div>
+                                    <div class="network-tip-row text-muted">点击聚合聚焦/取消聚焦</div>
+                                </template>
+                                <template v-else>
+                                    <div class="network-tip-title">{{ networkHover.node.icon }} {{ networkHover.node.emotion }} <span class="network-tip-no">{{ networkHover.node.count }} 人</span></div>
+                                    <div class="network-tip-row">🔴 {{ networkHover.node.highCount }} 高 · 🟠 {{ networkHover.node.mediumCount }} 中</div>
+                                    <div class="network-tip-row text-muted">点击分支聚焦/取消聚焦</div>
+                                </template>
+                            </div>
+                            <div v-if="networkGraph && (!networkGraph.groups || !networkGraph.groups.length)" class="network-empty">暂无学生数据</div>
+                            <div v-else-if="networkGraph && networkFollowUp && !networkVisibleCount" class="network-empty">✨ 当前没有需要跟进的学生</div>
+                            <div v-else-if="networkLoading && !networkGraph" class="network-empty">⏳ 正在构建情绪网络...</div>
+                        </div>
+                        <div class="network-footbar">
+                            <span class="network-legend-item"><i style="background:#ef4444"></i>高风险</span>
+                            <span class="network-legend-item"><i style="background:#f59e0b"></i>中风险</span>
+                            <span class="network-legend-item"><i style="background:#10b981"></i>低风险</span>
+                            <span class="ml-auto text-xs text-muted">🖱 滚轮缩放 · 拖拽平移 · 双击复位 · 点击学生跳转对话 · 视频通话后自动更新</span>
                         </div>
                     </div>
                 </div>
@@ -345,36 +443,49 @@
                                             <div v-if="yoloEmotionDisplay.confidence!=='--'" class="text-xs opacity-70">置信度 {{ yoloEmotionDisplay.confidence }}%</div>
                                             <button @click="toggleYolo" class="btn btn-xs mt-2" :class="yoloActive?'btn-danger':'btn-success'">{{ yoloActive?'⏹ 停止':'▶ 开启' }}</button></div>
                                         <div v-else class="text-center p-4 opacity-60"><div style="font-size:32px;margin-bottom:4px">🎥</div><div>点击开启实时情绪识别</div><button @click="toggleYolo" class="btn btn-success btn-xs mt-2">▶ 开启监测</button></div>
-<div v-if="yoloEmotionShow" class="mb-2"><div class="flex justify-between text-xs opacity-60"><span>????</span><span>{{ yoloEmotionDisplay.intensity }}/10</span></div><div class="emotion-intensity-bar"><div class="fill" :style="{width:yoloEmotionDisplay.intensity*10+'%',background:yoloEmotionDisplay.color}"></div></div><div class="flex justify-between text-xs opacity-60 mt-1"><span>动作匹配置信度</span><span>{{ yoloEmotionDisplay.actionConfidence||0 }}%</span></div></div>
-                                        <div class="emotion-details" v-if="yoloActive">
-                                            <div class="emotion-detail-item"><span class="label">😐 皱眉</span><span class="value" :style="{color:yoloEmotionDisplay.faceTension}">{{ yoloEmotionDisplay.browFurrow||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">😔 嘴角下垂</span><span class="value" :style="{color:yoloEmotionDisplay.mouthDown}">{{ yoloEmotionDisplay.mouthCornerDrop||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">😳 眼睛瞪大</span><span class="value" :style="{color:yoloEmotionDisplay.eyeOpenColor}">{{ yoloEmotionDisplay.eyeOpen||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">👀 视线</span><span class="value" :style="{color:yoloEmotionDisplay.gazeAvert}">{{ yoloEmotionDisplay.gazeAversion||0 }}% {{ yoloEmotionDisplay.gazeLabel }}</span></div>
-                                            <div class="emotion-detail-item"><span class="label">🗣 语速</span><span class="value" :style="{color:yoloEmotionDisplay.speechRate>45?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.speechRate||0 }}% {{ yoloEmotionDisplay.speechRateLabel }}</span></div>
-                                            <div class="emotion-detail-item"><span class="label">⏸ 停顿</span><span class="value" :style="{color:yoloEmotionDisplay.pauseRatio>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.pauseRatio||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">💓 低头</span><span class="value" :style="{color:yoloEmotionDisplay.posture}">{{ yoloEmotionDisplay.headDownPercent||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">🧍 前倾</span><span class="value" :style="{color:yoloEmotionDisplay.forwardHead>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.forwardHead||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">📐 肩线</span><span class="value" :style="{color:yoloEmotionDisplay.shoulderSlope>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.shoulderSlope||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">🧑‍💻 坐姿</span><span class="value" :style="{color:yoloEmotionDisplay.postureStiffnessColor}">{{ yoloEmotionDisplay.postureStiffness||0 }}% {{ yoloEmotionDisplay.postureStiffnessLabel }}</span></div>
-                                            <div class="emotion-detail-item"><span class="label">🧍 弯腰/驼背</span><span class="value" :style="{color:yoloEmotionDisplay.slouch>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.slouch||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">👀 眼神漂移</span><span class="value" :style="{color:yoloEmotionDisplay.gazeInstability>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.gazeInstability||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">🤭 摸鼻子</span><span class="value" :style="{color:yoloEmotionDisplay.touchNose>30?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.touchNose||0 }}%</span></div>
-                                            <div class="emotion-detail-item"><span class="label">🧠 挠头</span><span class="value" :style="{color:yoloEmotionDisplay.scratchHead>30?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.scratchHead||0 }}%</span></div></div>
-                                        <div v-if="yoloActive" class="text-xs opacity-60 mt-2">检测源：{{ yoloEmotionDisplay.poseDetected?'面部关键点 + 姿态估计':'面部关键点' }}</div>
-                                        <div v-if="yoloActive" class="mt-1 text-xs opacity-70">视觉状态：{{ visionDiag.modelReady?'模型已加载':'模型加载中/失败' }} · {{ visionDiag.faceDetected?'已识别到面部':'未识别到面部' }} · {{ visionDiag.poseDetected?'已识别到姿态':'未识别到姿态' }} · {{ visionDiag.status }} / {{ visionDiag.lastUpdate }}</div>
-                                        <div v-if="yoloActive&&visionDiag.lastError" class="mt-1 text-xs" style="color:#f59e0b">视觉诊断：{{ visionDiag.lastError }}</div>
-                                        <div v-if="yoloActive" class="mt-1 text-xs opacity-70">刷新帧：{{ visionDiag.frameCount||0 }} · 姿态帧：{{ visionDiag.poseFrameCount||0 }} · FaceMesh帧：{{ visionDiag.faceMeshFrameCount||0 }} · 视频：{{ visionDiag.videoSize||'--' }} · 细面部：{{ visionDiag.faceMeshDetected?'已识别':'未识别' }} · FaceMesh裁切：{{ visionDiag.faceMeshCropUsed?'已启用':'未启用' }} · 面部裁切：{{ visionDiag.faceCropUsed?'已启用':'未启用' }} · 指标变化：{{ visionDiag.changedAt||'--' }} · 未检出面部：{{ visionDiag.noFaceCount||0 }} 次</div>
-                                        <div v-if="yoloActive&&visionDiag.rawMicro" class="mt-1 text-xs opacity-60">原始指标：皱眉 {{ visionDiag.rawMicro.browFurrow||0 }} / 视线 {{ visionDiag.rawMicro.gazeAversion||0 }} / 眼神漂移 {{ visionDiag.rawMicro.gazeInstability||0 }} / 低头 {{ visionDiag.rawMicro.headDown||0 }} / 弯腰 {{ visionDiag.rawMicro.slouch||0 }} / 前倾 {{ visionDiag.rawMicro.forwardHead||0 }} / 肩线 {{ visionDiag.rawMicro.shoulderSlope||0 }} / 摸鼻 {{ visionDiag.rawMicro.touchNose||0 }} / 挠头 {{ visionDiag.rawMicro.scratchHead||0 }}</div>
-                                        <div v-if="yoloActive" class="audio-diagnostic-card mt-2 p-2 rounded-md text-xs">
-                                            <div class="flex justify-between"><span>🎧 声音互传</span><strong :style="{color:audioDiag.remoteAudio&&audioDiag.remoteEnabled?'#10b981':'#ef4444'}">{{ audioDiag.remoteAudio&&audioDiag.remoteEnabled?'已收到学生音轨':'未收到学生音轨' }}</strong></div>
-                                            <div class="mt-1 opacity-75">本地麦克风：{{ audioDiag.localMic&&audioDiag.localEnabled?'已开启':'未开启' }} · 远端音轨：{{ audioDiag.remoteTrackCount }} 路 / {{ audioDiag.remoteReady }}</div>
-                                            <div class="mt-1 opacity-75">实时音量：{{ audioDiag.volume }}% · {{ audioDiag.speaking?'说话中':'静音/停顿' }} · 基频：{{ audioDiag.pitch||0 }}Hz</div>
-                                            <div class="mt-1 opacity-75">分析器：{{ audioDiag.analyzer?'运行中':'未启动' }} · AudioContext：{{ audioDiag.contextState }} · 更新：{{ audioDiag.updatedAt }}</div>
-                                            <div v-if="audioDiag.playBlocked" class="mt-1" style="color:#f59e0b">浏览器拦截了远端声音自动播放，请点击视频区域或重新接听后再测试。</div>
-                                        </div>
-                                        <div v-if="yoloAlerts.length" class="emotion-alert-list"><div class="text-xs opacity-60 mb-1">检测记录</div>
-                                            <div v-for="(a,i) in yoloAlerts.slice(0,10)" :key="i" class="emotion-alert-item"><span>{{ EmotionFusionEngine?EmotionFusionEngine.emotionIcon(a.emotion):'🤔' }}</span><span class="flex-1">{{ a.emotion }}</span><span>Lv{{ a.severity }}</span></div></div>
+<div v-if="yoloEmotionShow" class="mb-2"><div class="flex justify-between text-xs opacity-60"><span>情绪强度</span><span>{{ yoloEmotionDisplay.intensity }}/10</span></div><div class="emotion-intensity-bar"><div class="fill" :style="{width:yoloEmotionDisplay.intensity*10+'%',background:yoloEmotionDisplay.color}"></div></div><div class="flex justify-between text-xs opacity-60 mt-1"><span>动作匹配置信度</span><span>{{ yoloEmotionDisplay.actionConfidence||0 }}%</span></div></div>
+                                        <details v-if="yoloActive" class="video-debug-panel mt-2">
+                                            <summary class="video-debug-summary">📊 实时微表情指标 <span class="video-debug-hint">点击展开</span></summary>
+                                            <div class="video-debug-body">
+                                                <div class="emotion-details">
+                                                    <div class="emotion-detail-item"><span class="label">😐 皱眉</span><span class="value" :style="{color:yoloEmotionDisplay.faceTension}">{{ yoloEmotionDisplay.browFurrow||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">😔 嘴角下垂</span><span class="value" :style="{color:yoloEmotionDisplay.mouthDown}">{{ yoloEmotionDisplay.mouthCornerDrop||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">😳 眼睛瞪大</span><span class="value" :style="{color:yoloEmotionDisplay.eyeOpenColor}">{{ yoloEmotionDisplay.eyeOpen||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">👀 视线</span><span class="value" :style="{color:yoloEmotionDisplay.gazeAvert}">{{ yoloEmotionDisplay.gazeAversion||0 }}% {{ yoloEmotionDisplay.gazeLabel }}</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">🗣 语速</span><span class="value" :style="{color:yoloEmotionDisplay.speechRate>45?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.speechRate||0 }}% {{ yoloEmotionDisplay.speechRateLabel }}</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">⏸ 停顿</span><span class="value" :style="{color:yoloEmotionDisplay.pauseRatio>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.pauseRatio||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">💓 低头</span><span class="value" :style="{color:yoloEmotionDisplay.posture}">{{ yoloEmotionDisplay.headDownPercent||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">🧍 前倾</span><span class="value" :style="{color:yoloEmotionDisplay.forwardHead>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.forwardHead||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">📐 肩线</span><span class="value" :style="{color:yoloEmotionDisplay.shoulderSlope>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.shoulderSlope||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">🧑‍💻 坐姿</span><span class="value" :style="{color:yoloEmotionDisplay.postureStiffnessColor}">{{ yoloEmotionDisplay.postureStiffness||0 }}% {{ yoloEmotionDisplay.postureStiffnessLabel }}</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">🧍 弯腰/驼背</span><span class="value" :style="{color:yoloEmotionDisplay.slouch>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.slouch||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">👀 眼神漂移</span><span class="value" :style="{color:yoloEmotionDisplay.gazeInstability>35?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.gazeInstability||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">🤭 摸鼻子</span><span class="value" :style="{color:yoloEmotionDisplay.touchNose>30?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.touchNose||0 }}%</span></div>
+                                                    <div class="emotion-detail-item"><span class="label">🧠 挠头</span><span class="value" :style="{color:yoloEmotionDisplay.scratchHead>30?'#f59e0b':'#10b981'}">{{ yoloEmotionDisplay.scratchHead||0 }}%</span></div>
+                                                </div>
+                                                <div class="mt-1 text-xs opacity-70">检测源：{{ yoloEmotionDisplay.poseDetected?'面部关键点 + 姿态估计':'面部关键点' }}</div>
+                                                <div class="mt-1 flex items-center justify-between text-xs"><span>🎧 声音互传</span><strong :style="{color:audioDiag.remoteAudio&&audioDiag.remoteEnabled?'#10b981':'#ef4444'}">{{ audioDiag.remoteAudio&&audioDiag.remoteEnabled?'已收到学生音轨':'未收到学生音轨' }}</strong></div>
+                                                <div v-if="yoloAlerts.length" class="emotion-alert-list mt-2">
+                                                    <div class="text-xs opacity-60 mb-1">检测记录</div>
+                                                    <div v-for="(a,i) in yoloAlerts.slice(0,10)" :key="i" class="emotion-alert-item"><span>{{ EmotionFusionEngine?EmotionFusionEngine.emotionIcon(a.emotion):'🤔' }}</span><span class="flex-1">{{ a.emotion }}</span><span>Lv{{ a.severity }}</span></div>
+                                                </div>
+                                            </div>
+                                        </details>
+                                        <details v-if="yoloActive" class="video-debug-panel mt-2">
+                                            <summary class="video-debug-summary">🛠 调试信息 <span class="video-debug-hint">点击展开</span></summary>
+                                            <div class="video-debug-body">
+                                                <div class="mt-1 text-xs opacity-70">视觉状态：{{ visionDiag.modelReady?'模型已加载':'模型加载中/失败' }} · {{ visionDiag.faceDetected?'已识别到面部':'未识别到面部' }} · {{ visionDiag.poseDetected?'已识别到姿态':'未识别到姿态' }} · {{ visionDiag.status }} / {{ visionDiag.lastUpdate }}</div>
+                                                <div v-if="visionDiag.lastError" class="mt-1 text-xs" style="color:#f59e0b">视觉诊断：{{ visionDiag.lastError }}</div>
+                                                <div class="mt-1 text-xs opacity-70">刷新帧：{{ visionDiag.frameCount||0 }} · 姿态帧：{{ visionDiag.poseFrameCount||0 }} · FaceMesh帧：{{ visionDiag.faceMeshFrameCount||0 }} · 视频：{{ visionDiag.videoSize||'--' }} · 细面部：{{ visionDiag.faceMeshDetected?'已识别':'未识别' }} · FaceMesh裁切：{{ visionDiag.faceMeshCropUsed?'已启用':'未启用' }} · 面部裁切：{{ visionDiag.faceCropUsed?'已启用':'未启用' }} · 指标变化：{{ visionDiag.changedAt||'--' }} · 未检出面部：{{ visionDiag.noFaceCount||0 }} 次</div>
+                                                <div v-if="visionDiag.rawMicro" class="mt-1 text-xs opacity-60">原始指标：皱眉 {{ visionDiag.rawMicro.browFurrow||0 }} / 视线 {{ visionDiag.rawMicro.gazeAversion||0 }} / 眼神漂移 {{ visionDiag.rawMicro.gazeInstability||0 }} / 低头 {{ visionDiag.rawMicro.headDown||0 }} / 弯腰 {{ visionDiag.rawMicro.slouch||0 }} / 前倾 {{ visionDiag.rawMicro.forwardHead||0 }} / 肩线 {{ visionDiag.rawMicro.shoulderSlope||0 }} / 摸鼻 {{ visionDiag.rawMicro.touchNose||0 }} / 挠头 {{ visionDiag.rawMicro.scratchHead||0 }}</div>
+                                                <div class="audio-diagnostic-card mt-2 p-2 rounded-md text-xs">
+                                                    <div class="mt-1 opacity-75">本地麦克风：{{ audioDiag.localMic&&audioDiag.localEnabled?'已开启':'未开启' }} · 远端音轨：{{ audioDiag.remoteTrackCount }} 路 / {{ audioDiag.remoteReady }}</div>
+                                                    <div class="mt-1 opacity-75">实时音量：{{ audioDiag.volume }}% · {{ audioDiag.speaking?'说话中':'静音/停顿' }} · 基频：{{ audioDiag.pitch||0 }}Hz</div>
+                                                    <div class="mt-1 opacity-75">分析器：{{ audioDiag.analyzer?'运行中':'未启动' }} · AudioContext：{{ audioDiag.contextState }} · 更新：{{ audioDiag.updatedAt }}</div>
+                                                    <div v-if="audioDiag.playBlocked" class="mt-1" style="color:#f59e0b">浏览器拦截了远端声音自动播放，请点击视频区域或重新接听后再测试。</div>
+                                                </div>
+                                            </div>
+                                        </details>
                                     </div>
                                 </div>
                                 <!-- 来电 -->
@@ -394,7 +505,7 @@
                                     </div>
                                 </div></div>
                                 <div v-if="talkReport" class="dialog-mask" @click.self="talkReport=null"><div class="dialog-box" style="max-width:640px">
-                                    <div class="flex justify-between items-center mb-4"><h3 class="m-0">📝 谈心记录报告</h3><button @click="talkReport=null" class="btn btn-ghost btn-sm">关闭</button></div>
+                                    <div class="flex justify-between items-center mb-4"><h3 class="m-0">📝 谈心记录报告</h3><div class="flex gap-2"><button @click="printTalkReport()" class="btn btn-outline btn-sm">🖨 打印/导出 PDF</button><button @click="talkReport=null" class="btn btn-ghost btn-sm">关闭</button></div></div>
                                     <div class="text-sm leading-relaxed" style="max-height:60vh;overflow-y:auto" v-html="Helpers.renderMd(talkReport.summary)"></div>
                                     <div class="mt-3 text-xs text-muted">✅ 已归档到学生档案（辅导记录）</div>
                                 </div></div>
@@ -416,8 +527,11 @@
                                 </div>
                                 <!-- 消息区 -->
                                 <div v-if="teacherSelected" class="flex-1 overflow-y-auto p-4 bg-tertiary" ref="teacherMsgRef">
-                                    <div v-for="msg in teacherChatMsgs" :key="msg.id" class="flex mb-3" :class="msg.sender_type==='counselor'?'justify-end':'justify-start'">
-                                        <div class="bubble" :class="msg.sender_type==='counselor'?'bubble-sent':'bubble-received'">{{ msg.content }}<div class="bubble-time">{{ Helpers.formatTime(msg.created_at) }}</div></div></div></div>
+                                    <div v-for="msg in teacherChatMsgs" :key="msg.id" class="flex items-start mb-3" :class="msg.sender_type==='counselor'?'justify-end':'justify-start'">
+                                        <div v-if="msg.sender_type==='assistant'" class="dh-log-ai" style="width:30px;height:30px;font-size:15px">🤖</div>
+                                        <div class="bubble" :class="msg.sender_type==='counselor'?'bubble-sent':(msg.sender_type==='assistant'?'bubble-ai':'bubble-received')"><span v-if="msg.sender_type==='assistant'" class="ai-badge">🤖 AI分身</span> {{ msg.content }}<div class="bubble-time">{{ Helpers.formatTime(msg.created_at) }}</div></div>
+                                    </div>
+                                </div>
                                 <div v-else class="flex-1 flex items-center justify-center text-muted">👈 选择学生开始对话</div>
                                 <!-- 输入区 -->
                                 <div v-if="teacherSelected" class="p-3 border-t bg-secondary">
@@ -430,6 +544,71 @@
                 </div>
 
                 <!-- ══════ 班会策划 ══════ -->
+                <!-- ══════ AI 数字人 ══════ -->
+                <div v-if="page==='digitalHuman'" class="fade-in">
+                    <div class="page-header"><div><h3>AI 数字人</h3><p class="text-muted text-sm mt-1">老师离线时，数字分身以心理专家视角、幽默亲切地回答学生</p></div></div>
+                    <!-- 数字人主卡片 -->
+                    <div class="dh-hero mb-5">
+                        <div class="dh-avatar">🤖<span class="dh-ring"></span><span class="dh-status-dot" :class="{off:!dhSettings.enabled}"></span></div>
+                        <div class="flex-1" style="position:relative;z-index:1">
+                            <div class="flex items-center gap-3 mb-1"><h2 class="m-0 text-xl font-bold">{{ dhSettings.name || '小聆' }} <span class="text-sm font-normal opacity-80">· {{ currentUser.display_name || currentUser.username || '老师' }}老师的 AI 分身</span></h2></div>
+                            <p class="m-0 text-sm opacity-90 leading-relaxed">{{ dhSettings.enabled ? '值班中：您离线期间，我会用幽默亲切的方式回复学生消息，并标注 AI 身份。' : '已休息：开启后，我将在您离线时代为回复学生。' }}</p>
+                            <div class="flex items-center gap-3 mt-3">
+                                <button class="dh-toggle" :class="{on:dhSettings.enabled}" @click="dhSettings.enabled=!dhSettings.enabled;saveDigitalHuman()"></button>
+                                <span class="text-sm font-semibold">{{ dhSettings.enabled ? '数字人已开启' : '数字人已关闭' }}</span>
+                                <button class="btn btn-sm" style="margin-left:auto;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.34)" @click="dhVoiceEnabled=!dhVoiceEnabled" :title="dhVoiceEnabled?'关闭自动朗读':'开启自动朗读'">{{ dhVoiceEnabled ? '🔊 自动朗读已开' : '🔈 自动朗读已关' }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="two-col">
+                        <!-- 人设配置 -->
+                        <div class="card m-0"><div class="card-header"><span class="card-title">🎭 分身人设</span></div>
+                            <div class="form-group"><label>分身昵称</label><input class="input" v-model="dhSettings.name" maxlength="8" placeholder="例如：小聆" @blur="saveDigitalHuman()"></div>
+                            <div class="form-group"><label>幽默程度 <b class="text-brand">{{ ['','稳重','温和','风趣','段子手'][dhSettings.humor]||'风趣' }}</b></label>
+                                <input type="range" min="1" max="4" step="1" v-model.number="dhSettings.humor" @change="saveDigitalHuman()" style="width:100%"></div>
+                            <div class="form-group"><label>自动回复延迟（秒）</label><input class="input" type="number" min="1" max="10" v-model.number="dhSettings.delay" @blur="saveDigitalHuman()"></div>
+                            <div class="form-group"><label>回复风格</label><select class="input" v-model="dhSettings.style" @change="saveDigitalHuman()">
+                                <option value="humor">幽默风趣 + 颜文字</option>
+                                <option value="warm">温暖亲切</option>
+                                <option value="pro">专业稳重</option>
+                            </select></div>
+                            <div class="p-3 rounded-md text-xs text-muted" style="background:var(--bg-tertiary);line-height:1.8">🛡 安全承诺：所有 AI 回复都会标注「AI 分身」身份；识别到自伤/危机信号时，数字人会立即切换为认真语气、推送心理援助热线并自动生成风险预警通知您。</div>
+                        </div>
+                        <!-- 试聊 -->
+                        <div class="card m-0"><div class="card-header"><span class="card-title">💬 试聊体验</span><span class="text-xs text-muted">以学生身份和分身聊聊</span></div>
+                            <div class="overflow-y-auto mb-3" style="max-height:280px;min-height:180px">
+                                <div v-for="(m,i) in dhPreviewMsgs" :key="i" class="mb-3">
+                                    <div v-if="m.role==='student'" class="flex justify-end mb-2"><div class="bubble bubble-sent" style="max-width:85%">{{ m.text }}</div></div>
+                                    <div v-else class="flex gap-2 items-start"><div class="dh-log-ai" style="width:28px;height:28px;font-size:14px">🤖</div><div class="dh-preview-bubble"><span class="ai-badge">🤖 AI分身</span> {{ m.text }}<button class="msg-speak-btn" @click.stop="speakDigitalHuman(m.text)" title="朗读这条回复">🔊</button></div></div>
+                                </div>
+                                <div v-if="dhPreviewLoading" class="flex gap-2 items-start"><div class="dh-log-ai ai-typing-avatar" style="width:28px;height:28px;font-size:14px">🤖</div><div class="dh-preview-bubble"><span class="typing-dots"><i></i><i></i><i></i></span></div></div>
+                            </div>
+                            <div class="flex gap-2 flex-wrap mb-3">
+                                <button v-for="q in dhQuickQs" :key="q" class="network-filter-chip" @click="askDigitalHuman(q)">{{ q }}</button>
+                            </div>
+                            <div class="chat-compose-row"><input class="input chat-compose-input" v-model="dhPreviewInput" @keydown.enter.prevent="askDigitalHuman()" placeholder="输入想测试的问题..."><button class="btn btn-primary chat-send-btn" @click="askDigitalHuman()" :disabled="dhPreviewLoading||!dhPreviewInput.trim()">发送</button></div>
+                        </div>
+                    </div>
+                    <!-- 值班日志 -->
+                    <div class="card mt-4"><div class="card-header"><span class="card-title">📋 分身值班日志</span><button class="btn btn-outline btn-xs" @click="loadDigitalHumanLogs">🔄 刷新</button></div>
+                        <div v-if="dhLogs.length" class="overflow-y-auto" style="max-height:320px">
+                            <div v-for="log in dhLogs" :key="log.id" class="dh-log-item">
+                                <div class="dh-log-ai">🤖</div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center justify-between gap-2 mb-1">
+                                        <div class="text-xs text-muted">回复 <b>{{ log.student_name }}</b> · {{ Helpers.formatTime(log.created_at) }}<span v-if="log.crisis" class="badge badge-danger" style="margin-left:6px">危机</span></div>
+                                        <button v-if="!log.handled" class="btn btn-xs btn-outline" @click="markDigitalHumanLogHandled(log)">标记已处理</button>
+                                        <span v-else class="text-xs text-success font-semibold">✓ 已处理<span v-if="log.handled_at"> · {{ Helpers.formatDateTime(log.handled_at) }}</span></span>
+                                    </div>
+                                    <div style="line-height:1.6">{{ log.content }}</div>
+                                    <div v-if="log.handled_note" class="text-xs text-muted mt-1">处理备注：{{ log.handled_note }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="empty-state p-6">暂无值班记录，学生发消息且您离线时分身会自动上岗</div>
+                    </div>
+                </div>
+
                 <div v-if="page==='classMeeting'" class="fade-in">
                     <div class="card"><div class="card-header"><span class="card-title">📋 班会策划</span></div>
                         <p class="text-secondary mb-4">输入班会主题，AI 自动生成完整的策划方案</p>
@@ -450,20 +629,86 @@
 
                 <!-- ══════ 风险预警 ══════ -->
                 <div v-if="page==='alerts'" class="fade-in">
-                    <div class="card"><div class="card-header"><span class="card-title">🚨 风险预警中心</span></div>
-                        <div class="table-container" v-if="alerts.length">
-                            <table class="table"><thead><tr><th>学生</th><th>班级</th><th>情绪</th><th>强度</th><th>等级</th><th>状态</th><th>操作</th></tr></thead><tbody>
-                                <tr v-for="a in alerts" :key="a.id"><td class="font-semibold">{{ a.student_name }}</td><td class="text-xs text-muted">{{ a.student_class }}</td><td>{{ a.emotion_type }}</td><td>{{ a.intensity }}/10</td><td><span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'muted'}[a.risk_level])">{{ Helpers.riskLbl(a.risk_level) }}</span></td><td><span :class="a.status==='pending'?'text-warning':a.status==='resolved'?'text-success':'text-muted'" class="text-xs font-semibold">{{ {pending:'待处理',acknowledged:'已确认',resolved:'已解决'}[a.status] }}</span></td><td><button v-if="a.status==='pending'" @click="ackAlert(a.id)" class="btn btn-sm" style="background:var(--brand-gradient);color:white">确认处理</button><span v-else class="text-xs text-success">✓</span></td></tr></tbody></table>
-                        </div><div v-else class="empty-state">✨ 暂无预警记录</div></div>
+                    <div class="card" :class="{'crisis-card':crisisOnly}"><div class="card-header"><span class="card-title">{{ crisisOnly ? '🛡 危机处置中心' : '🚨 风险预警中心' }}</span>
+                        <div class="flex gap-2 flex-wrap">
+                            <button v-for="tab in [{key:'pending',label:'待处理'},{key:'acknowledged',label:'已确认'},{key:'resolved',label:'已解决'},{key:'all',label:'全部'}]" :key="tab.key" class="btn btn-sm" :class="alertStatusFilter===tab.key ? 'btn-primary' : 'btn-ghost'" @click="alertStatusFilter=tab.key">{{ tab.label }} <span class="opacity-70">({{ alertStatusCounts[tab.key] }})</span></button>
+                            <button v-if="['super_admin','student_affairs'].indexOf(currentUser.role)!==-1" class="btn btn-sm" :class="crisisOnly ? 'btn-danger' : 'btn-ghost'" @click="toggleCrisisOnly">危机工单</button>
+                        </div></div>
+                        <div class="table-container" v-if="alertsLoading">
+                            <div class="skeleton skeleton-text" style="width:25%"></div>
+                            <div class="skeleton skeleton-text" style="width:80%"></div>
+                            <div class="skeleton skeleton-text" style="width:62%"></div>
+                        </div>
+                        <div class="table-container" v-else-if="filteredAlerts.length">
+                            <table class="table"><thead><tr><th>学生</th><th>班级</th><th>情绪</th><th>等级</th><th>触发时间</th><th>状态</th><th>操作</th></tr></thead><tbody>
+                                <tr v-for="a in filteredAlerts" :key="a.id" :class="{'crisis-row': crisisOnly && (a.risk_level==='high'||a.risk_level==='critical')}">
+                                    <td class="font-semibold">{{ a.student_name }}</td>
+                                    <td class="text-xs text-muted">{{ a.student_class }}</td>
+                                    <td>{{ a.emotion_type || '-' }}</td>
+                                    <td><span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'muted'}[a.risk_level])">{{ Helpers.riskLbl(a.risk_level) }}</span></td>
+                                    <td class="text-xs text-muted">{{ Helpers.formatTime(a.created_at) }}</td>
+                                    <td><div><span :class="a.status==='pending'?'text-warning':a.status==='resolved'?'text-success':'text-muted'" class="text-xs font-semibold">{{ {pending:'待处理',acknowledged:'已确认',resolved:'已解决'}[a.status] }}</span></div><div v-if="a.escalated" class="text-xs text-danger mt-1">已升级协同</div></td>
+                                    <td class="alert-actions flex gap-2">
+                                        <template v-if="crisisOnly && ['super_admin','student_affairs'].indexOf(currentUser.role)!==-1 && a.status!=='resolved'">
+                                            <button @click="openAssignCrisisAlert(a)" class="btn btn-sm btn-primary">指派</button>
+                                            <button @click="closeCrisisAlert(a)" class="btn btn-sm btn-danger">关闭工单</button>
+                                        </template>
+                                        <button v-if="a.status==='pending'" @click="ackAlert(a.id)" class="btn btn-sm" style="background:var(--brand-gradient);color:white">确认处理</button>
+                                        <button v-if="a.status==='acknowledged'" @click="openResolveAlert(a)" class="btn btn-sm btn-success">解决归档</button>
+                                        <button v-if="(a.risk_level==='high'||a.risk_level==='critical')&&!a.escalated&&a.status!=='resolved'" @click="escalateAlert(a.id)" class="btn btn-sm btn-danger">升级协同</button>
+                                        <button @click="openResolveAlert(a)" class="btn btn-sm btn-ghost">{{ a.status==='resolved' ? '查看' : '详情' }}</button>
+                                    </td>
+                                </tr></tbody></table>
+                        </div><div v-else class="empty-state">✨ 当前状态暂无预警记录</div></div>
+
+                    <div v-if="resolvingAlert" class="dialog-mask" @click.self="closeResolveAlert"><div class="dialog-box" style="max-width:620px">
+                        <div class="flex justify-between items-center mb-4"><h3 class="m-0">预警处置</h3><button @click="closeResolveAlert" class="btn btn-ghost btn-sm">关闭</button></div>
+                        <div class="p-4 rounded-md text-sm" style="background:var(--bg-tertiary);line-height:1.9">
+                            <div><strong>学生：</strong>{{ resolvingAlert.student_name }} <span class="text-xs text-muted">{{ resolvingAlert.student_class }}</span></div>
+                            <div><strong>风险等级：</strong><span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'muted'}[resolvingAlert.risk_level])">{{ Helpers.riskLbl(resolvingAlert.risk_level) }}</span></div>
+                            <div><strong>触发情绪：</strong>{{ resolvingAlert.emotion_type || '-' }}<span v-if="resolvingAlert.intensity"> · {{ resolvingAlert.intensity }}/10</span></div>
+                            <div><strong>触发时间：</strong>{{ Helpers.formatTime(resolvingAlert.created_at) }}</div>
+                            <div><strong>预警描述：</strong>{{ resolvingAlert.description || '系统检测到学生情绪波动，建议尽快关注。' }}</div>
+                            <div v-if="resolvingAlert.resolution"><strong>处理备注：</strong>{{ resolvingAlert.resolution }}</div>
+                        </div>
+                        <div v-if="resolvingAlert.status==='pending'" class="dialog-btns"><button class="btn btn-primary" @click="ackAlert(resolvingAlert.id)">确认处理</button></div>
+                        <div v-else-if="resolvingAlert.status==='acknowledged'">
+                            <div class="form-group"><label>处理备注</label><textarea class="input" v-model="resolveNote" rows="4" placeholder="记录约谈、转介、回访安排等处置结果..."></textarea></div>
+                            <div class="dialog-btns"><button class="btn btn-ghost" @click="closeResolveAlert">取消</button><button class="btn btn-success" :disabled="resolveSubmitting" @click="submitResolveAlert">{{ resolveSubmitting ? '提交中...' : '解决并归档' }}</button></div>
+                        </div>
+                        <div v-else class="dialog-btns"><button class="btn btn-ghost" @click="closeResolveAlert">关闭</button></div>
+                    </div></div>
+
+                    <div v-if="assigningCrisisAlert" class="dialog-mask" @click.self="closeAssignCrisisAlert"><div class="dialog-box" style="max-width:520px">
+                        <div class="flex justify-between items-center mb-4"><h3 class="m-0">指派危机工单</h3><button @click="closeAssignCrisisAlert" class="btn btn-ghost btn-sm">关闭</button></div>
+                        <div class="p-4 rounded-md text-sm" style="background:var(--bg-tertiary);line-height:1.9">
+                            <div><strong>学生：</strong>{{ assigningCrisisAlert.student_name }} <span class="text-xs text-muted">{{ assigningCrisisAlert.student_class }}</span></div>
+                            <div><strong>触发情绪：</strong>{{ assigningCrisisAlert.emotion_type || '危机' }}</div>
+                            <div><strong>描述：</strong>{{ assigningCrisisAlert.description || '危机工单需尽快处置' }}</div>
+                        </div>
+                        <div class="form-group mt-4">
+                            <label>指派给辅导员</label>
+                            <select class="input" v-model="crisisAssignTo">
+                                <option value="">请选择辅导员</option>
+                                <option v-for="c in crisisCounselors" :key="c.id" :value="c.id">{{ c.display_name }}{{ c.college ? ' · ' + c.college : '' }}</option>
+                            </select>
+                        </div>
+                        <div class="dialog-btns"><button class="btn btn-ghost" @click="closeAssignCrisisAlert">取消</button><button class="btn btn-primary" :disabled="crisisAssignSubmitting" @click="submitAssignCrisisAlert">{{ crisisAssignSubmitting ? '提交中...' : '确认指派' }}</button></div>
+                    </div></div>
                 </div>
 
                 <!-- ══════ 学生管理 ══════ -->
                 <div v-if="page==='students'" class="fade-in">
                     <div class="card"><div class="flex justify-between items-center mb-4 flex-wrap gap-3"><span class="card-title m-0">👥 学生管理</span>
                         <div class="flex gap-3 items-center"><input class="input input-sm" v-model="studentSearch" @input="searchStudentsHandler" placeholder="搜索学号/姓名..." style="width:200px"><button @click="showAddStudent=true" class="btn btn-primary btn-sm">+ 添加学生</button></div></div>
-                        <div class="table-container">
+                        <div class="table-container" v-if="studentsLoading">
+                            <div class="skeleton skeleton-text" style="width:28%"></div>
+                            <div class="skeleton skeleton-text" style="width:74%"></div>
+                            <div class="skeleton skeleton-text" style="width:58%"></div>
+                        </div>
+                        <div class="table-container" v-else>
                             <table class="table"><thead><tr><th>学号</th><th>姓名</th><th>性别</th><th>班级</th><th>情绪状态</th><th>风险等级</th><th>操作</th></tr></thead><tbody>
-                                <tr v-for="s in students" :key="s.student_id"><td>{{s.student_id}}</td><td class="font-semibold">{{s.name}}</td><td class="text-xs text-muted">{{s.gender}}</td><td class="text-xs text-muted">{{s.class_name||'-'}}</td><td><span class="font-medium" :style="{color:Helpers.emoColor(s.emotion_status)}">{{s.emotion_status||'未知'}}</span></td><td><span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'muted'}[s.risk_level])">{{Helpers.riskLbl(s.risk_level)}}</span></td><td><button class="btn btn-sm" style="background:var(--brand-gradient);color:white" @click="viewStudent(s.student_id)">详情</button></td></tr>
+                                <tr v-for="s in students" :key="s.student_id"><td>{{s.student_id}}</td><td class="font-semibold">{{s.name}}</td><td class="text-xs text-muted">{{s.gender}}</td><td class="text-xs text-muted">{{s.class_name||'-'}}</td><td><span class="font-medium" :style="{color:Helpers.emoColor(s.emotion_status)}">{{s.emotion_status||'未知'}}</span></td><td><span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'muted'}[s.risk_level])">{{Helpers.riskLbl(s.risk_level)}}</span></td><td><button class="btn btn-sm" style="background:var(--brand-gradient);color:white" @click="viewStudent(s.id)">详情</button></td></tr>
                                 <tr v-if="!students.length"><td colspan="7" class="text-center text-muted p-8">暂无学生数据，点击「添加学生」开始</td></tr></tbody></table>
                         </div>
                         <!-- 分页 -->
@@ -471,9 +716,44 @@
                             <button class="btn btn-outline btn-xs" disabled>上一页</button><span class="text-xs text-muted self-center px-2">共 {{ students.length }} 条</span><button class="btn btn-outline btn-xs" disabled>下一页</button></div>
                     </div>
                     <!-- 学生详情弹窗 -->
-                    <div v-if="selectedStudent" class="dialog-mask" @click.self="selectedStudent=null"><div class="dialog-box" style="max-width:560px">
+                    <div v-if="selectedStudent" class="dialog-mask" @click.self="selectedStudent=null"><div class="dialog-box" style="max-width:620px">
                         <div class="flex items-center gap-4 mb-4"><div class="avatar avatar-lg">{{(selectedStudent.name||'?')[0]}}</div><div><h3 class="m-0">{{selectedStudent.name}} <span class="text-sm text-muted font-normal">{{selectedStudent.student_id}}</span></h3><div class="text-sm text-secondary">{{selectedStudent.class_name||''}} | {{selectedStudent.college||''}}</div></div></div>
-                        <div class="text-sm text-secondary leading-loose"><div><strong>性别：</strong>{{selectedStudent.gender||'未设置'}}</div><div><strong>手机：</strong>{{selectedStudent.phone||'未设置'}}</div><div><strong>情绪状态：</strong><span :style="{color:Helpers.emoColor(selectedStudent.emotion_status)}">{{selectedStudent.emotion_status||'未知'}}</span></div><div><strong>风险等级：</strong><span class="badge" :class="'badge-'+(selectedStudent.risk_level==='high'?'danger':selectedStudent.risk_level==='medium'?'warning':'success')">{{Helpers.riskLbl(selectedStudent.risk_level)}}</span></div><div class="mt-2"><strong>备注：</strong></div><textarea class="input mt-1" v-model="selectedStudent.notes" @blur="updateStudentNotes(selectedStudent.student_id,selectedStudent.notes)" placeholder="添加备注..."></textarea></div>
+                        <div class="text-sm text-secondary leading-loose"><div><strong>性别：</strong>{{selectedStudent.gender||'未设置'}}</div><div><strong>手机：</strong>{{selectedStudent.phone||'未设置'}}</div><div><strong>情绪状态：</strong><span :style="{color:Helpers.emoColor(selectedStudent.emotion_status)}">{{selectedStudent.emotion_status||'未知'}}</span></div><div><strong>风险等级：</strong><span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'muted',critical:'danger'}[selectedStudent.risk_level]||'muted')">{{Helpers.riskLbl(selectedStudent.risk_level)}}</span></div><div class="mt-2"><strong>备注：</strong></div><textarea class="input mt-1" v-model="selectedStudent.notes" @blur="updateStudentNotes(selectedStudent.id,selectedStudent.notes)" placeholder="添加备注..."></textarea></div>
+                        <div class="mt-4 border-t pt-3">
+                            <div class="flex justify-between items-center">
+                                <button class="btn btn-ghost btn-sm" @click="toggleStudentRiskTimeline">{{ showStudentRiskTimeline ? '收起风险时间线' : '查看风险时间线' }}</button>
+                                <span v-if="studentRiskTimelineLoading" class="text-xs text-muted">加载中...</span>
+                            </div>
+                            <div v-if="showStudentRiskTimeline" class="risk-timeline mt-3">
+                                <div v-if="studentRiskTimelineLoading" class="skeleton skeleton-text" style="width:100%"></div>
+                                <div v-else-if="studentRiskTimeline.length" class="risk-timeline-list">
+                                    <div v-for="ev in studentRiskTimeline" :key="ev.id" class="risk-timeline-item">
+                                        <div class="risk-timeline-head">
+                                            <span class="risk-timeline-source">{{ Helpers.sourceLbl(ev.source) }}</span>
+                                            <span class="badge" :class="'badge-'+({high:'danger',medium:'warning',low:'success',none:'muted',critical:'danger'}[ev.risk_level]||'muted')">{{ Helpers.riskLbl(ev.risk_level) }}</span>
+                                            <span class="risk-timeline-time">{{ Helpers.formatDateTime(ev.created_at || '') }}</span>
+                                        </div>
+                                        <div class="risk-timeline-meta">{{ ev.emotion_status || '情绪状态未记录' }}</div>
+                                        <div v-if="ev.description" class="risk-timeline-desc">{{ ev.description }}</div>
+                                    </div>
+                                </div>
+                                <div v-else class="empty-state">暂无风险证据，当前状态可能来自初始化或人工调整前。</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 border-t pt-3">
+                            <label>人工调整风险等级</label>
+                            <div class="flex gap-2">
+                                <select class="input input-sm" v-model="manualRiskLevel" style="flex:1">
+                                    <option value="low">低风险</option>
+                                    <option value="medium">中风险</option>
+                                    <option value="high">高风险</option>
+                                    <option value="critical">危急风险</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline" @click="adjustStudentRisk" :disabled="manualRiskLevel===selectedStudent.risk_level && !manualRiskReason.trim()">调整</button>
+                            </div>
+                            <input class="input mt-2" v-model="manualRiskReason" placeholder="调整原因（建议填写，便于审计）">
+                            <p class="text-xs text-muted mt-1">系统证据只升不降；人工调整允许显式降级并记录审计。</p>
+                        </div>
                         <div v-if="studentProfiles.length" class="mt-4"><h4 class="mb-3">辅导记录</h4><div v-for="(p,i) in studentProfiles" :key="i" class="p-3 bg-tertiary rounded-md mb-2 text-sm"><div class="text-muted mb-1 text-xs">{{p.created_at||''}}</div><div v-html="Helpers.renderMd(p.content||p.summary||'')"></div></div></div>
                         <div class="dialog-btns"><button class="btn btn-ghost" @click="selectedStudent=null">关闭</button></div></div></div>
                     <!-- 添加学生弹窗 -->
@@ -491,6 +771,7 @@
                 <!-- ══════ 情绪看板 ══════ -->
                 <div v-if="page==='emotionBoard'" class="fade-in">
                     <div class="page-header"><div><h3>情绪看板</h3><p class="text-muted text-sm mt-1">学生情绪健康全景监测</p></div><div class="flex gap-2"><button class="btn btn-success btn-sm" @click="seedRealtimeDemoData()">✨ 预置演示数据</button><button class="btn btn-outline btn-sm" @click="loadEmotionDashboard()">🔄 刷新数据</button></div></div>
+                    <template v-if="!emoBoardLoading">
                     <div class="stats-row"><div class="stat-card blue"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('students',20)"></div><div class="stat-label">监测学生总数</div><div class="stat-value">{{ emoDashStats.total||0 }}</div></div>
                         <div class="stat-card red"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('alert',20)"></div><div class="stat-label">高风险预警</div><div class="stat-value">{{ emoDashStats.highRisk||0 }}</div></div>
                         <div class="stat-card orange"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('emotion',20)"></div><div class="stat-label">中风险关注</div><div class="stat-value">{{ emoDashStats.mediumRisk||0 }}</div></div>
@@ -510,6 +791,8 @@
                         </div>
                         <div v-else class="empty-state p-5">暂无实时分析记录，可点击“预置演示数据”载入展示样例</div>
                     </div>
+                    </template>
+                    <div v-else class="loading-overlay"><span class="loading-spinner"></span> 正在加载情绪看板...</div>
                 </div>
 
                 <!-- Reminders -->
@@ -521,9 +804,34 @@
 
                 <!-- ══════ 知识库 ══════ -->
                 <div v-if="page==='knowledge'" class="fade-in">
-                    <div class="card"><div class="card-header"><span class="card-title">📚 知识库管理</span></div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">📚 知识库管理</span></div>
                         <p class="text-muted text-sm mb-4">上传学校规章制度文档，AI 基于文档内容回答问题</p>
-                        <div class="flex gap-3 items-center"><button @click="$refs.docInput.click()" class="btn btn-success btn-sm">📄 上传文档</button><input type="file" accept=".pdf,.txt,.docx,.md" @change="uploadDoc" style="display:none" ref="docInput"><span v-if="kbStats" class="text-sm text-secondary">文档: <b>{{ kbStats.doc_count||0 }}</b> · 文本块: <b>{{ kbStats.chunk_count||0 }}</b></span></div></div>
+                        <div class="flex gap-3 items-center flex-wrap mb-5">
+                            <button @click="$refs.docInput.click()" class="btn btn-success btn-sm">📄 上传文档</button>
+                            <input type="file" accept=".pdf,.txt,.docx,.md" @change="uploadDoc" style="display:none" ref="docInput">
+                            <span v-if="kbStats" class="text-sm text-secondary">文档: <b>{{ kbStats.doc_count||0 }}</b> · 文本块: <b>{{ kbStats.chunk_count||0 }}</b></span>
+                        </div>
+                        <div class="table-container" v-if="kbLoading">
+                            <div class="skeleton skeleton-text" style="width:35%"></div>
+                            <div class="skeleton skeleton-text" style="width:70%"></div>
+                            <div class="skeleton skeleton-text" style="width:55%"></div>
+                        </div>
+                        <div class="table-container" v-else-if="kbDocs.length">
+                            <table class="table">
+                                <thead><tr><th>文档名称</th><th>文本块</th><th>索引时间</th><th>操作</th></tr></thead>
+                                <tbody>
+                                    <tr v-for="doc in kbDocs" :key="doc.doc_id">
+                                        <td class="font-medium">{{ doc.filename || doc.doc_id }}</td>
+                                        <td>{{ doc.chunk_count || 0 }}</td>
+                                        <td class="text-xs text-muted">{{ doc.created_at || '-' }}</td>
+                                        <td><button v-if="currentUser.role==='super_admin'" class="btn btn-danger btn-sm" :disabled="kbDeleting===doc.doc_id" @click="deleteKbDoc(doc.doc_id)">{{ kbDeleting===doc.doc_id?'删除中...':'删除' }}</button><span v-else class="text-xs text-muted">只读</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div v-else class="empty-state">✨ 暂无知识库文档，上传后 AI 即可检索回答</div>
+                    </div>
                 </div>
 
                 <!-- ══════ 系统管理 ══════ -->
@@ -548,6 +856,19 @@
                         <div class="widget"><div class="widget-header"><span class="widget-icon" v-html="Icons.render('lightbulb')"></span><span>今日灵感</span></div><div class="quote-card"><div class="quote-mark">"</div><p class="text-sm text-secondary leading-relaxed mb-2" style="font-style:italic">{{ dailyQuote.text }}</p><p class="text-xs text-muted text-right">—— {{ dailyQuote.author }}</p></div></div>
                         <div class="widget word-card"><div class="widget-header"><span class="widget-icon" v-html="Icons.render('book')"></span><span>每日英语</span></div><div class="word-en">{{ dailyWord.word }}</div><div class="text-sm text-muted mb-1">{{ dailyWord.phonetic }}</div><div class="text-sm text-secondary mb-2">{{ dailyWord.meaning }}</div><div class="text-xs text-muted" style="font-style:italic">"{{ dailyWord.sentence }}"</div></div>
                         <div class="widget"><div class="widget-header"><span class="widget-icon" v-html="Icons.render('mood')"></span><span>今日心情</span></div><div class="mood-selector mb-3"><div class="mood-option" :class="{selected:todayMood==='happy'}" @click="recordMood('happy')" title="开心">😊</div><div class="mood-option" :class="{selected:todayMood==='calm'}" @click="recordMood('calm')" title="平静">😌</div><div class="mood-option" :class="{selected:todayMood==='neutral'}" @click="recordMood('neutral')" title="一般">😐</div><div class="mood-option" :class="{selected:todayMood==='down'}" @click="recordMood('down')" title="低落">😔</div><div class="mood-option" :class="{selected:todayMood==='anxious'}" @click="recordMood('anxious')" title="焦虑">😰</div></div><p class="text-center text-sm text-muted">{{ todayMoodText }}</p></div></div>
+                    <div class="card mb-5">
+                        <div class="card-header"><span class="card-title">📈 我的情绪趋势</span><button class="btn btn-outline btn-sm" @click="loadStudentTrend">🔄 刷新</button></div>
+                        <div v-if="studentTrendLoading" class="loading-overlay"><span class="loading-spinner"></span> 正在加载情绪趋势...</div>
+                        <div v-else>
+                            <div class="stats-row mb-4">
+                                <div class="stat-card blue"><div class="stat-accent"></div><div class="stat-label">近14天记录</div><div class="stat-value">{{ studentTrendSummary.total }}</div><div class="stat-sub">视频/语音情绪样本</div></div>
+                                <div class="stat-card green"><div class="stat-accent"></div><div class="stat-label">平均情绪强度</div><div class="stat-value">{{ studentTrendSummary.avgIntensity }}</div><div class="stat-sub">满分 10 分</div></div>
+                                <div class="stat-card red"><div class="stat-accent"></div><div class="stat-label">较高波动天数</div><div class="stat-value">{{ studentTrendSummary.highCount }}</div><div class="stat-sub">日均强度 ≥ 7</div></div>
+                            </div>
+                            <div ref="studentTrendChart" style="height:240px"></div>
+                            <p v-if="!studentTrendSummary.total" class="text-center text-sm text-muted mt-3">暂无情绪检测记录，可联系老师发起一次视频谈心。</p>
+                        </div>
+                    </div>
                     <div class="grid-3 gap-3"><div @click="page='studentChat'" class="widget text-center cursor-pointer p-5"><div class="mb-2 text-brand" v-html="Icons.render('chat')"></div><div class="font-semibold text-sm">联系老师</div><div class="text-xs text-muted mt-1">{{ studentUnreadCount?studentUnreadCount+' 条未读':'暂无新消息' }}</div></div>
                         <div @click="page='studentAppointment'" class="widget text-center cursor-pointer p-5"><div class="mb-2 text-brand" v-html="Icons.render('calendar')"></div><div class="font-semibold text-sm">预约咨询</div><div class="text-xs text-muted mt-1">面对面谈心</div></div>
                         <div @click="page='studentProfile'" class="widget text-center cursor-pointer p-5"><div class="mb-2 text-brand" v-html="Icons.render('user')"></div><div class="font-semibold text-sm">个人中心</div><div class="text-xs text-muted mt-1">查看个人信息</div></div></div>
@@ -560,7 +881,7 @@
                             <div v-for="contact in messageContacts" :key="contact.id" @click="selectContactHandler(contact)" class="flex items-center gap-3 p-3 cursor-pointer border-b border-light transition" :class="{'bg-brand-50':selectedContact&&selectedContact.id===contact.id}"><div class="avatar">{{ contact.name[0] }}</div><div class="flex-1 min-w-0"><div class="flex justify-between items-center"><span class="font-semibold text-sm">{{ contact.name }}老师</span><span v-if="contact.unread_count" class="badge badge-danger badge-sm">{{ contact.unread_count }}</span></div><div v-if="contact.last_message" class="text-xs text-muted mt-1 truncate">{{ contact.last_message.content }}</div></div></div>
                             <div v-if="!messageContacts.length" class="empty-state p-8">暂无消息</div></div>
                         <div class="chat-main">
-                            <div v-if="selectedContact" class="flex items-center justify-between p-3 px-4 border-b"><span class="font-bold text-base">{{ selectedContact.name }}老师</span>
+                            <div v-if="selectedContact" class="flex items-center justify-between p-3 px-4 border-b"><span class="font-bold text-base">{{ selectedContact.name }}老师 <span v-if="contactPresence" class="chat-online-pill" :class="contactPresence.online?'online':'ai'"><i></i>{{ contactPresence.online ? '在线' : (contactPresence.dh_enabled ? 'AI分身·'+(contactPresence.dh_name||'小聆')+'值班中' : '离线') }}</span></span>
                                 <div class="flex gap-2 items-center"><button @click="crisisReport()" class="btn btn-sm btn-danger">🆘 紧急求助</button><button @click="startVideoCall" v-if="!isInCall" class="btn btn-sm" style="background:var(--brand-gradient);color:white">📹 视频</button><template v-else><span class="emotion-live-indicator active"></span><span class="text-xs text-success">通话中</span><button @click="toggleVideo" class="btn btn-xs" :class="isVideoEnabled?'btn-outline':'btn-danger'">📷</button><button @click="toggleAudio" class="btn btn-xs" :class="isAudioEnabled?'btn-outline':'btn-danger'">🎤</button><button @click="endVideoCall" class="btn btn-danger btn-xs">挂断</button></template></div>
                             <!-- 微信式视频：大画面(对方) + 右下小窗(自己) -->
                             <div v-if="isInCall" class="relative bg-dark" style="height:400px;border-radius:8px;overflow:hidden">
@@ -572,7 +893,7 @@
                                 </div>
                             </div>
                                                         <div v-if="incomingStudentCall" class="flex items-center justify-between p-3 mx-4 my-2 bg-brand-50 rounded-md border" style="border-color:var(--brand-500)"><span class="font-semibold">📞 {{ incomingStudentCall.teacher_name||'老师' }} 邀请你视频通话</span><div class="flex gap-2"><button @click="acceptStudentCall" class="btn btn-success btn-xs">接听</button><button @click="rejectStudentCall" class="btn btn-danger btn-xs">拒绝</button></div></div>
-                            <div v-if="selectedContact" class="flex-1 overflow-y-auto p-4 bg-tertiary" ref="studentMsgRef"><div v-for="msg in chatMessages" :key="msg.id" class="flex mb-3" :class="msg.sender_type==='student'?'justify-end':'justify-start'"><div class="bubble" :class="msg.sender_type==='student'?'bubble-sent':'bubble-received'">{{ msg.content }}<div class="bubble-time">{{ Helpers.formatTime(msg.created_at) }}</div></div></div></div>
+                            <div v-if="selectedContact" class="flex-1 overflow-y-auto p-4 bg-tertiary" ref="studentMsgRef"><div v-for="msg in chatMessages" :key="msg.id" class="flex items-start mb-3" :class="msg.sender_type==='student'?'justify-end':'justify-start'"><div v-if="msg.sender_type==='assistant'" class="dh-log-ai" style="width:30px;height:30px;font-size:15px">🤖</div><div class="bubble" :class="msg.sender_type==='student'?'bubble-sent':(msg.sender_type==='assistant'?'bubble-ai':'bubble-received')"><span v-if="msg.sender_type==='assistant'" class="ai-badge">🤖 AI分身</span> {{ msg.content }}<button v-if="msg.sender_type==='assistant'" class="msg-speak-btn" @click.stop="speakDigitalHuman(msg.content)" title="朗读这条回复">🔊</button><div class="bubble-time">{{ Helpers.formatTime(msg.created_at) }}</div></div></div><div v-if="assistantTyping" class="flex items-start mb-3"><div class="dh-log-ai ai-typing-avatar" style="width:30px;height:30px;font-size:15px">🤖</div><div class="bubble bubble-ai ai-typing-bubble"><span class="ai-badge">🤖 AI分身</span><span class="typing-dots"><i></i><i></i><i></i></span></div></div></div>
                             <div v-else class="flex-1 flex items-center justify-center text-muted">👈 选择联系人开始聊天</div>
                             <div v-if="selectedContact" class="p-3 border-t bg-secondary">
                                 <div v-if="showEmoji" class="grid mb-2" style="grid-template-columns:repeat(10,1fr);gap:4px;max-height:200px;overflow-y:auto;background:var(--bg-tertiary);padding:var(--space-2);border-radius:var(--radius-md)"><span v-for="e in emojiList" :key="e" @click="insertEmoji(e)" style="font-size:20px;cursor:pointer;padding:4px;text-align:center;border-radius:4px">{{ e }}</span></div>
@@ -586,6 +907,44 @@
                     <div class="card"><div class="card-header"><span class="card-title">📅 预约咨询</span></div><div class="two-col gap-6">
                         <div><h4 class="mb-4 font-semibold">创建新预约</h4><div class="form-group"><label>选择辅导员</label><select class="input" v-model="newAppointment.counselor_id"><option value="">请选择辅导员</option><option v-for="c in counselors" :key="c.id" :value="c.id">{{ c.display_name }} - {{ c.college }}</option></select></div><div class="form-group"><label>预约时间</label><input class="input" v-model="newAppointment.appointment_time" type="datetime-local"></div><div class="form-group"><label>咨询原因</label><textarea class="input" v-model="newAppointment.reason" rows="3" placeholder="请简要描述咨询原因..."></textarea></div><button @click="createAppointment" class="btn btn-primary w-full">提交预约</button></div>
                         <div><h4 class="mb-4 font-semibold">我的预约</h4><div v-for="appt in appointments" :key="appt.id" class="p-4 bg-tertiary rounded-md mb-3"><div class="flex justify-between items-center mb-2"><span class="font-semibold">{{ appt.counselor_name||'辅导员' }}</span><span class="badge" :class="'badge-'+({confirmed:'success',pending:'warning',completed:'brand',cancelled:'muted'}[appt.status])">{{ {pending:'待确认',confirmed:'已确认',completed:'已完成',cancelled:'已取消'}[appt.status] }}</span></div><div class="text-sm text-secondary"><div>时间：{{ appt.appointment_time }}</div><div v-if="appt.reason">原因：{{ appt.reason }}</div></div></div><div v-if="!appointments.length" class="empty-state p-8">暂无预约记录</div></div></div></div>
+                </div>
+
+                <!-- 辅导员预约管理 -->
+                <div v-if="page==='teacherAppointments'" class="fade-in">
+                    <div class="page-header">
+                        <div><h3>预约管理</h3><p class="text-muted text-sm mt-1">确认预约会自动进入待办，完成后沉淀为谈心记录</p></div>
+                        <button class="btn btn-outline btn-sm" @click="loadAppointments()">🔄 刷新</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">📅 学生预约</span>
+                            <div class="flex gap-2 flex-wrap">
+                                <button v-for="tab in [{key:'all',label:'全部'},{key:'pending',label:'待确认'},{key:'confirmed',label:'已确认'},{key:'completed',label:'已完成'},{key:'cancelled',label:'已取消'}]" :key="tab.key" class="btn btn-sm" :style="appointmentFilter===tab.key ? 'background:var(--brand-gradient);color:white' : ''" @click="setAppointmentFilter(tab.key)">{{ tab.label }}</button>
+                            </div>
+                        </div>
+                        <div v-if="appointments.length">
+                            <div v-for="appt in appointments" :key="appt.id" class="p-4 bg-tertiary rounded-md mb-3">
+                                <div class="flex justify-between items-start gap-3 mb-2">
+                                    <div>
+                                        <div class="font-semibold">{{ appt.student_name||'学生' }}</div>
+                                        <div class="text-sm text-secondary mt-1">时间：{{ appt.appointment_time }} · 时长：{{ appt.duration||30 }} 分钟</div>
+                                        <div class="text-sm text-secondary">原因：{{ appt.reason||'未填写' }}</div>
+                                    </div>
+                                    <span class="badge" :class="'badge-'+({confirmed:'success',pending:'warning',completed:'brand',cancelled:'muted'}[appt.status])">{{ {pending:'待确认',confirmed:'已确认',completed:'已完成',cancelled:'已取消'}[appt.status] }}</span>
+                                </div>
+                                <div v-if="appt.notes" class="text-sm bg-tertiary p-3 rounded-md mb-3">处理备注：{{ appt.notes }}</div>
+                                <div class="form-group">
+                                    <textarea class="input" v-model="appointmentNotes[appt.id]" rows="2" placeholder="填写处理备注，完成预约时用于沉淀谈心记录..."></textarea>
+                                </div>
+                                <div class="flex flex-wrap gap-2 mt-3">
+                                    <button v-if="appt.status==='pending'" @click="updateAppointmentStatus(appt.id,'confirmed')" :disabled="updatingAppointmentId===appt.id" class="btn btn-sm" style="background:var(--brand-gradient);color:white">{{ updatingAppointmentId===appt.id?'处理中...':'确认预约' }}</button>
+                                    <button v-if="['pending','confirmed'].includes(appt.status)" @click="updateAppointmentStatus(appt.id,'completed')" :disabled="updatingAppointmentId===appt.id" class="btn btn-success btn-sm">{{ updatingAppointmentId===appt.id?'处理中...':'完成并沉淀记录' }}</button>
+                                    <button v-if="['pending','confirmed'].includes(appt.status)" @click="updateAppointmentStatus(appt.id,'cancelled')" :disabled="updatingAppointmentId===appt.id" class="btn btn-danger btn-sm">{{ updatingAppointmentId===appt.id?'处理中...':'取消预约' }}</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="empty-state p-8">暂无{{ appointmentFilter==='all'?'':({pending:'待确认',confirmed:'已确认',completed:'已完成',cancelled:'已取消'}[appointmentFilter]) }}预约</div>
+                    </div>
                 </div>
 
                 <!-- 心理测评（分步导航） -->
@@ -633,9 +992,49 @@
 <script id="echarts-loader">
 (function(){window._loadECharts=function(cb){if(window.echarts)return cb();var s=document.createElement('script');s.src='/static/echarts.min.js?v=4.1';s.onload=cb;document.head.appendChild(s);};})();
 </script>
-<!-- 核心库 -->
-<script src="/static/marked.min.js?v=4.1" defer></script>
-<script src="/static/socket.io.min.js?v=4.1" defer></script>
+<script id="socketio-loader">
+(function(){window._loadSocketIO=function(cb){if(window.io)return cb();var s=document.createElement('script');s.src='/static/socket.io.min.js?v=4.1';s.onload=cb;s.onerror=function(){cb();};document.head.appendChild(s);};})();
+</script>
+<!-- Markdown/DOMPurify 按需加载 (谈心报告/会议纪要/公文/学生档案等页面) -->
+<script id="markdown-loader">
+(function() {
+  var markdownPromise = null;
+  window._loadMarkdown = function(cb) {
+    if (window.marked && window.DOMPurify) {
+      if (cb) cb();
+      return Promise.resolve();
+    }
+    if (!markdownPromise) {
+      markdownPromise = new Promise(function(resolve, reject) {
+        var pending = 2;
+        var fail = false;
+        function done() {
+          pending -= 1;
+          if (pending === 0) {
+            if (!fail && window.marked && window.DOMPurify) resolve();
+            else reject(new Error('Markdown 依赖加载失败'));
+          }
+        }
+        function load(src, onload) {
+          var s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          s.onload = onload;
+          s.onerror = function() { fail = true; onload(); };
+          document.head.appendChild(s);
+        }
+        load('/static/marked.min.js?v=4.1', done);
+        load('/static/js/vendor/purify.min.js?v=4.1', done);
+      }).catch(function(err) {
+        markdownPromise = null;
+        throw err;
+      });
+    }
+    if (cb) markdownPromise.then(cb).catch(function() {});
+    return markdownPromise;
+  };
+})();
+</script>
 <!-- face-api.js 按需加载 (仅视频通话) -->
 <script id="faceapi-loader">
 (function(){window._loadFaceAPI=function(cb){if(window.faceapi)return cb();var s=document.createElement('script');s.src='/static/js/vendor/face-api.min.js';s.onload=cb;s.onerror=function(){var f=document.createElement('script');f.src='https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';f.onload=cb;document.head.appendChild(f);};document.head.appendChild(s);};})();
@@ -649,6 +1048,9 @@
 <script src="/static/js/realtime/voice-analyzer.js?v=4.4"></script>
 <script src="/static/js/realtime/emotion-fusion.js?v=4.8"></script>
 <script src="/static/js/network-graph.js?v=5.4"></script>
+<script src="/static/js/modules/digital-human.js?v=5.5"></script>
+<script src="/static/js/modules/appointments.js?v=5.5"></script>
+<script src="/static/js/modules/assessment.js?v=5.5"></script>
 <script src="/static/js/app.js?v=5.5"></script>
 </body>
 </html>

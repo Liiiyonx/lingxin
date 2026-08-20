@@ -40,7 +40,7 @@
         try {
           var d = await API.get('/system/test-accounts');
           if (d && d.success && d.data) testAccounts.value = d.data;
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('测试账号加载失败', e); }
       }
 
       // ==================== 主题 ====================
@@ -73,10 +73,10 @@
       const pageTitle = computed(function() {
         var m = {
           dashboard: '今日工作台', teacherChat: '师生对话', classMeeting: '班会策划',
-          docWriting: '公文写作', alerts: '风险预警', knowledge: '知识库', system: '系统管理',
+          docWriting: '公文写作', digitalHuman: 'AI 数字人', alerts: '风险预警', knowledge: '知识库', system: '系统管理',
           students: '学生管理', emotionBoard: '情绪看板', emotionNetwork: '情绪网络图', reminders: '提醒中心',
           studentHome: '我的首页', studentChat: '联系老师', studentAssessment: '心理测评',
-          studentAppointment: '预约咨询', studentProfile: '个人中心'
+          studentAppointment: '预约咨询', teacherAppointments: '预约管理', studentProfile: '个人中心'
         };
         return m[page.value] || '聆心';
       });
@@ -108,7 +108,7 @@
             if (page.value === 'emotionBoard') { loadEmotionDashboard(); }
             setRole();
             initSocket();
-            if (currentUser.role === 'counselor') initTeacherVideo();
+            if (currentUser.role === 'counselor') { initTeacherVideo(); startPresencePing(); }
           } else if (d.token) {
             setSession(d.token, d.user || {});
             localStorage.setItem('user_type', 'staff');
@@ -119,7 +119,7 @@
             if (page.value === 'emotionBoard') { loadEmotionDashboard(); }
             setRole();
             initSocket();
-            if (currentUser.role === 'counselor') initTeacherVideo();
+            if (currentUser.role === 'counselor') { initTeacherVideo(); startPresencePing(); }
           } else {
             Toast.error(d.message || '登录失败，请检查用户名和密码');
           }
@@ -212,17 +212,25 @@
         isLoggedIn.value = false;
         loginType.value = 'staff';
         stopAllRealtime();
+        stopPresencePing();
       }
 
       function setRole() {
         var r = currentUser.role;
         document.documentElement.setAttribute('data-role',
           r === 'student' ? 'student' : r === 'super_admin' ? 'super_admin' : 'counselor');
+        if (typeof networkClusterMode !== 'undefined' && typeof networkClusterBy !== 'undefined') {
+          var schoolView = r === 'super_admin' || r === 'student_affairs';
+          networkClusterMode.value = schoolView ? 'force' : 'auto';
+          networkClusterBy.value = schoolView ? 'college' : 'class';
+        }
       }
 
       // ==================== API 错误监听 ====================
       API.on('unauthorized', function() { handleLogout(); });
-      API.on('error', function(msg) { Toast.error(msg); });
+      API.on('critical-error', function(payload) {
+        Toast.error(payload.message || '操作失败，请稍后重试', '重试', payload.retry);
+      });
 
       // ==================== 工作台 ====================
       const wp = reactive({
@@ -271,18 +279,18 @@
         try {
           var d = await API.get('/workplan/today');
           if (d && d.data) Object.assign(wp, d.data);
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('工作台数据加载失败', e); }
       }
 
       async function loadDash() {
         try {
           var d = await API.get('/system/dashboard');
           if (d) { Object.assign(dash, d); setTimeout(renderCharts, 400); }
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('仪表盘数据加载失败', e); }
         try {
           var a = await API.get('/alert/list', { limit: 5 });
           recentAlerts.value = a.data || a.items || [];
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('预警列表加载失败', e); }
       }
 
       function wpCalPrev() {
@@ -326,12 +334,23 @@
       const cPie = ref(null), cTrend = ref(null), cRisk = ref(null);
       let pieChart = null, trendChart = null, riskChart = null;
 
+      function ensureChart(inst, el, dark) {
+        var disposed = inst && inst.isDisposed ? inst.isDisposed() : false;
+        if (inst && !disposed && inst.__themeDark === dark) {
+          inst.clear();
+          return inst;
+        }
+        if (inst && !disposed) inst.dispose();
+        var next = echarts.init(el, dark ? 'dark' : undefined);
+        next.__themeDark = dark;
+        return next;
+      }
+
       function renderCharts() {
         if (typeof echarts === 'undefined') { window._loadECharts && window._loadECharts(function(){renderCharts();}); return; }
         try {
           if (cPie.value) {
-            if (pieChart) pieChart.dispose();
-            pieChart = echarts.init(cPie.value, isDarkMode.value ? 'dark' : undefined);
+            pieChart = ensureChart(pieChart, cPie.value, isDarkMode.value);
             var dist = dash.emotion_distribution || {};
             var data = Object.entries(dist).map(function(e) { return { name: e[0], value: e[1] }; });
             pieChart.setOption({
@@ -340,24 +359,32 @@
                 data: data.length ? data : [{ name: '暂无数据', value: 1 }],
                 color: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6']
               }]
-            });
+            }, { notMerge: true });
           }
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('图表渲染失败', e); }
       }
 
       // ==================== 学生管理 ====================
       const students = ref([]);
+      const studentsLoading = ref(false);
       const studentSearch = ref('');
       const showAddStudent = ref(false);
       const newStudent = reactive({ student_id: '', name: '', gender: '', college: '', class_name: '', phone: '', notes: '' });
       const selectedStudent = ref(null);
       const studentProfiles = ref([]);
+      const studentRiskTimeline = ref([]);
+      const studentRiskTimelineLoading = ref(false);
+      const showStudentRiskTimeline = ref(false);
+      const manualRiskLevel = ref('low');
+      const manualRiskReason = ref('');
 
       const searchStudentsDebounced = Helpers.debounce(async function() {
+        studentsLoading.value = true;
         try {
           var d = await API.get('/student/list', { search: studentSearch.value, per_page: 100 });
           students.value = d.data || [];
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('学生列表加载失败', e); }
+        finally { studentsLoading.value = false; }
       }, 300);
 
       async function loadStudents() { searchStudentsDebounced(); }
@@ -377,24 +404,203 @@
           var d = await API.get('/student/' + sid);
           selectedStudent.value = d.data;
           var p = await API.get('/student/' + sid + '/profiles');
+          if (window._loadMarkdown) await window._loadMarkdown();
           studentProfiles.value = p.data || [];
+          showStudentRiskTimeline.value = false;
+          studentRiskTimeline.value = [];
+          manualRiskLevel.value = selectedStudent.value.risk_level || 'low';
+          manualRiskReason.value = '';
+          loadStudentRiskTimeline(sid);
         } catch (e) { Toast.error('获取详情失败'); }
       }
 
       async function updateStudentNotes(sid, notes) {
         try { await API.put('/student/' + sid, { notes: notes }); Toast.success('备注已更新'); }
-        catch (e) { /* silent */ }
+        catch (e) { console.warn('学生备注保存失败', e); }
+      }
+
+      async function loadStudentRiskTimeline(sid) {
+        if (!sid) return;
+        studentRiskTimelineLoading.value = true;
+        try {
+          var d = await API.get('/student/' + sid + '/risk-timeline');
+          studentRiskTimeline.value = d.data || [];
+        } catch (e) {
+          console.warn('学生风险时间线加载失败', e);
+          studentRiskTimeline.value = [];
+        } finally {
+          studentRiskTimelineLoading.value = false;
+        }
+      }
+
+      function toggleStudentRiskTimeline() {
+        showStudentRiskTimeline.value = !showStudentRiskTimeline.value;
+        if (showStudentRiskTimeline.value && selectedStudent.value && !studentRiskTimeline.value.length) {
+          loadStudentRiskTimeline(selectedStudent.value.id);
+        }
+      }
+
+      async function adjustStudentRisk() {
+        if (!selectedStudent.value) return;
+        var sid = selectedStudent.value.id;
+        try {
+          var d = await API.put('/student/' + sid + '/risk', {
+            risk_level: manualRiskLevel.value,
+            reason: manualRiskReason.value.trim() || '辅导员人工调整风险等级'
+          });
+          if (d.success) {
+            Toast.success('风险等级已调整');
+            var fresh = await API.get('/student/' + sid);
+            selectedStudent.value = fresh.data || selectedStudent.value;
+            manualRiskLevel.value = selectedStudent.value.risk_level || 'low';
+            manualRiskReason.value = '';
+            await loadStudentRiskTimeline(sid);
+          } else {
+            Toast.error(d.message || '调整失败');
+          }
+        } catch (e) {
+          Toast.error(e.message || '调整失败，请稍后重试');
+        }
       }
 
       // ==================== 预警 ====================
       const alerts = ref([]);
+      const alertsLoading = ref(false);
+      const alertStatusFilter = ref('pending');
+      const crisisOnly = ref(false);
+      const resolvingAlert = ref(null);
+      const resolveNote = ref('');
+      const resolveSubmitting = ref(false);
+      const crisisCounselors = ref([]);
+      const assigningCrisisAlert = ref(null);
+      const crisisAssignTo = ref('');
+      const crisisAssignSubmitting = ref(false);
+      const filteredAlerts = computed(function() {
+        var status = alertStatusFilter.value;
+        if (status === 'all') return alerts.value;
+        return alerts.value.filter(function(a) { return a.status === status; });
+      });
+      const alertStatusCounts = computed(function() {
+        var counts = { all: alerts.value.length, pending: 0, acknowledged: 0, resolved: 0 };
+        alerts.value.forEach(function(a) {
+          if (counts[a.status] !== undefined) counts[a.status] += 1;
+        });
+        return counts;
+      });
       async function loadAlerts() {
-        try { var d = await API.get('/alert/list'); alerts.value = d.data || d.items || []; }
-        catch (e) { /* silent */ }
+        alertsLoading.value = true;
+        try {
+          var endpoint = crisisOnly.value && ['super_admin', 'student_affairs'].indexOf(currentUser.role) !== -1
+            ? '/alert/crisis-center'
+            : '/alert/list';
+          var d = await API.get(endpoint, { per_page: 100, status: alertStatusFilter.value === 'all' ? '' : alertStatusFilter.value });
+          alerts.value = d.data || d.items || [];
+        }
+        catch (e) { Toast.error('预警列表加载失败'); }
+        finally { alertsLoading.value = false; }
+      }
+      function toggleCrisisOnly() {
+        crisisOnly.value = !crisisOnly.value;
+        loadAlerts();
+      }
+      async function loadCrisisCounselors() {
+        try {
+          var d = await API.get('/counselors/list');
+          crisisCounselors.value = d.data || [];
+        } catch (e) {
+          console.warn('辅导员列表加载失败', e);
+        }
+      }
+      function openAssignCrisisAlert(a) {
+        assigningCrisisAlert.value = a;
+        crisisAssignTo.value = a.assigned_to || '';
+        loadCrisisCounselors();
+      }
+      function closeAssignCrisisAlert() {
+        assigningCrisisAlert.value = null;
+        crisisAssignTo.value = '';
+      }
+      async function submitAssignCrisisAlert() {
+        var alert = assigningCrisisAlert.value;
+        if (!alert) return;
+        var assignedTo = parseInt(crisisAssignTo.value, 10);
+        if (!assignedTo) {
+          Toast.warning('请选择指派辅导员');
+          return;
+        }
+        crisisAssignSubmitting.value = true;
+        try {
+          await API.put('/alert/crisis-center/' + alert.id + '/assign', { assigned_to: assignedTo });
+          Toast.success('危机工单已指派');
+          closeAssignCrisisAlert();
+          await loadAlerts();
+        } catch (e) {
+          Toast.error(e.message || '指派失败，请稍后重试');
+        } finally {
+          crisisAssignSubmitting.value = false;
+        }
+      }
+      async function closeCrisisAlert(a) {
+        if (!a) return;
+        var resolution = window.prompt('关闭备注（可选）：', '已完成危机处置并确认学生安全');
+        if (resolution === null) return;
+        try {
+          await API.put('/alert/crisis-center/' + a.id + '/close', { resolution: resolution.trim() });
+          Toast.success('危机工单已关闭，学生风险已重算');
+          await loadAlerts();
+        } catch (e) {
+          Toast.error(e.message || '关闭失败，请稍后重试');
+        }
       }
       async function ackAlert(id) {
-        await API.put('/alert/' + id + '/acknowledge');
-        loadAlerts();
+        try {
+          await API.put('/alert/' + id + '/acknowledge');
+          Toast.success('预警已确认，可进入处置流程');
+          if (resolvingAlert.value && resolvingAlert.value.id === id) {
+            resolvingAlert.value = Object.assign({}, resolvingAlert.value, { status: 'acknowledged' });
+          }
+          await loadAlerts();
+        } catch (e) {
+          Toast.error(e.message || '确认失败，请稍后重试');
+        }
+      }
+      function openResolveAlert(a) {
+        resolvingAlert.value = a;
+        resolveNote.value = a.resolution || '';
+      }
+      function closeResolveAlert() {
+        resolvingAlert.value = null;
+        resolveNote.value = '';
+      }
+      async function submitResolveAlert() {
+        var alert = resolvingAlert.value;
+        if (!alert) return;
+        if (!resolveNote.value.trim()) {
+          Toast.warning('请填写处理备注，便于后续回访与归档');
+          return;
+        }
+        resolveSubmitting.value = true;
+        try {
+          await API.put('/alert/' + alert.id + '/resolve', { resolution: resolveNote.value.trim() });
+          Toast.success('预警已解决并归档');
+          closeResolveAlert();
+          await loadAlerts();
+        } catch (e) {
+          Toast.error(e.message || '解决失败，请稍后重试');
+        } finally {
+          resolveSubmitting.value = false;
+        }
+      }
+      async function escalateAlert(id) {
+        var note = window.prompt('升级说明（可选）：', '建议心理中心/学工处协同处置');
+        if (note === null) return;
+        try {
+          await API.put('/alert/' + id + '/escalate', { note: note });
+          Toast.success('已升级至心理中心/学工处');
+          await loadAlerts();
+        } catch (e) {
+          Toast.error(e.message || '升级失败，请稍后重试');
+        }
       }
 
       // ==================== 提醒 ====================
@@ -402,7 +608,7 @@
       const showCompleted = ref(false);
       async function loadReminders() {
         try { var d = await API.get('/student/reminder/list'); reminders.value = d.data || []; }
-        catch (e) { /* silent */ }
+        catch (e) { console.warn('提醒列表加载失败', e); }
       }
       async function completeReminder(rid) {
         try { await API.put('/student/reminder/' + rid + '/complete'); Toast.success('提醒已完成'); loadReminders(); }
@@ -416,6 +622,7 @@
         meetingLoading.value = true;
         try {
           var d = await API.post('/conversation/organize', { scene: '班会策划', content: meetingTheme.value });
+          if (window._loadMarkdown) await window._loadMarkdown();
           meetingResult.value = d.content || d.result || '生成失败';
         } catch (e) { meetingResult.value = '请求失败'; }
         meetingLoading.value = false;
@@ -427,6 +634,7 @@
         docLoading.value = true;
         try {
           var d = await API.post('/conversation/organize', { scene: '公文写作', content: '文种：' + docType.value + '\n\n内容：' + docContent.value });
+          if (window._loadMarkdown) await window._loadMarkdown();
           docResult.value = d.content || d.result || '生成失败';
         } catch (e) { docResult.value = '请求失败'; }
         docLoading.value = false;
@@ -434,25 +642,52 @@
 
       // ==================== 知识库 ====================
       const kbStats = ref(null);
+      const kbDocs = ref([]);
+      const kbLoading = ref(false);
+      const kbDeleting = ref(null);
       async function loadKbStats() {
         try { var d = await API.get('/knowledge/stats'); if (d && d.data) kbStats.value = d.data; }
-        catch (e) { /* silent */ }
+        catch (e) { console.warn('知识库统计加载失败', e); }
+      }
+      async function loadKbDocs() {
+        try {
+          var d = await API.get('/knowledge/documents');
+          kbDocs.value = (d && (d.data || d.items)) || [];
+        } catch (e) { console.warn('知识库文档列表加载失败', e); }
+      }
+      async function loadKnowledge() {
+        kbLoading.value = true;
+        try { await Promise.all([loadKbStats(), loadKbDocs()]); }
+        finally { kbLoading.value = false; }
       }
       async function uploadDoc(e) {
         var f = e.target.files[0]; if (!f) return;
         var fd = new FormData(); fd.append('file', f);
-        try { var d = await API.upload('/knowledge/upload', fd); Toast.success(d.message || '上传成功'); loadKbStats(); }
+        try { var d = await API.upload('/knowledge/upload', fd); Toast.success(d.message || '上传成功'); loadKnowledge(); }
         catch (e) { Toast.error('上传失败'); }
+        finally { e.target.value = ''; }
+      }
+      async function deleteKbDoc(docId) {
+        if (!confirm('确认删除该知识库文档？删除后不可恢复。')) return;
+        kbDeleting.value = docId;
+        try {
+          var d = await API.del('/knowledge/documents/' + encodeURIComponent(docId));
+          Toast.success(d.message || '文档已删除');
+          loadKnowledge();
+        } catch (e) { Toast.error('删除失败'); }
+        finally { kbDeleting.value = null; }
       }
 
       // ==================== 情绪看板 ====================
       const emoDashStats = reactive({ total: 0, highRisk: 0, mediumRisk: 0, avgIntensity: 0 });
       const emoDashAlerts = ref([]);
       const realtimeEmotionLogs = ref([]);
+      const emoBoardLoading = ref(false);
       const emoPieChart = ref(null), emoRiskChart = ref(null), emoTrendChart = ref(null), emoHeatmapChart = ref(null);
       let emoPieInst = null, emoRiskInst = null, emoTrendInst = null, emoHeatInst = null;
 
       async function loadEmotionDashboard() {
+        emoBoardLoading.value = true;
         try {
           var s = await API.get('/emotion/statistics');
           if (s && s.data) {
@@ -461,11 +696,12 @@
             emoDashStats.mediumRisk = s.data.medium_risk_count || 0;
             emoDashStats.avgIntensity = s.data.avg_intensity || 0;
           }
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('情绪统计加载失败', e); }
         try { var a = await API.get('/alert/list', { per_page: 10 }); emoDashAlerts.value = a.data || a.items || []; }
-        catch (e) { /* silent */ }
+        catch (e) { console.warn('情绪预警加载失败', e); }
         try { var logs = await API.get('/emotion/logs', { per_page: 12 }); realtimeEmotionLogs.value = logs.data || []; }
-        catch (e) { /* silent */ }
+        catch (e) { console.warn('情绪日志加载失败', e); }
+        emoBoardLoading.value = false;
         await nextTick();
         renderEmoCharts();
       }
@@ -486,12 +722,13 @@
         var isDark = isDarkMode.value;
         // Pie
         if (emoPieChart.value) {
-          if (emoPieInst) emoPieInst.dispose();
-          emoPieInst = echarts.init(emoPieChart.value, isDark ? 'dark' : undefined);
+          emoPieInst = ensureChart(emoPieInst, emoPieChart.value, isDark);
+          var pieChart = emoPieInst;
           API.get('/emotion/statistics').then(function(d) {
             var dist = d && d.data ? d.data.emotion_distribution : {};
             var data = Object.entries(dist || {}).map(function(e) { return { name: e[0], value: e[1].count || e[1] }; });
-            emoPieInst.setOption({
+            if (pieChart.isDisposed && pieChart.isDisposed()) return;
+            pieChart.setOption({
               tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
               series: [{
                 type: 'pie', radius: ['45%', '75%'], roseType: 'area',
@@ -500,13 +737,12 @@
                 data: data.length ? data : [{ name: '暂无', value: 1 }],
                 color: ['#6366f1', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#e67e22', '#f97316', '#94a3b8']
               }]
-            });
+            }, { notMerge: true });
           }).catch(function() {});
         }
         // Risk ring
         if (emoRiskChart.value) {
-          if (emoRiskInst) emoRiskInst.dispose();
-          emoRiskInst = echarts.init(emoRiskChart.value, isDark ? 'dark' : undefined);
+          emoRiskInst = ensureChart(emoRiskInst, emoRiskChart.value, isDark);
           emoRiskInst.setOption({
             tooltip: { trigger: 'item' },
             series: [{
@@ -518,19 +754,20 @@
                 { name: '低风险', value: Math.max(0, (emoDashStats.total || 0) - emoDashStats.highRisk - emoDashStats.mediumRisk), itemStyle: { color: '#10b981' } }
               ]
             }]
-          });
+          }, { notMerge: true });
         }
         // Trend
         if (emoTrendChart.value) {
-          if (emoTrendInst) emoTrendInst.dispose();
-          emoTrendInst = echarts.init(emoTrendChart.value, isDark ? 'dark' : undefined);
+          emoTrendInst = ensureChart(emoTrendInst, emoTrendChart.value, isDark);
+          var trendChart = emoTrendInst;
           API.get('/emotion/trends', { days: 7 }).then(function(d) {
             var data = d && d.data ? d.data : [];
             var labels = [], vals = [];
             if (Array.isArray(data)) {
               data.forEach(function(item) { labels.push(item.date || item.day || ''); vals.push(item.count || item.avg_intensity || 0); });
             }
-            emoTrendInst.setOption({
+            if (trendChart.isDisposed && trendChart.isDisposed()) return;
+            trendChart.setOption({
               tooltip: { trigger: 'axis' },
               grid: { top: 10, right: 10, bottom: 20, left: 35 },
               xAxis: { type: 'category', data: labels.length ? labels : ['暂无数据'], axisLabel: { fontSize: 10 } },
@@ -540,13 +777,13 @@
                 areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(99,102,241,0.35)' }, { offset: 1, color: 'rgba(99,102,241,0.02)' }] } },
                 lineStyle: { color: '#6366f1', width: 2 }, itemStyle: { color: '#6366f1' }, symbol: 'circle', symbolSize: 6
               }]
-            });
+            }, { notMerge: true });
           }).catch(function() {});
         }
         // Heatmap
         if (emoHeatmapChart.value) {
-          if (emoHeatInst) emoHeatInst.dispose();
-          emoHeatInst = echarts.init(emoHeatmapChart.value, isDark ? 'dark' : undefined);
+          emoHeatInst = ensureChart(emoHeatInst, emoHeatmapChart.value, isDark);
+          var heatChart = emoHeatInst;
           API.get('/emotion/heatmap').then(function(d) {
             var data = d && d.data ? d.data : [];
             var hData = [];
@@ -554,14 +791,15 @@
               for (var i = 0; i < data.matrix.length; i++)
                 for (var j = 0; j < data.matrix[i].length; j++)
                   hData.push([j, i, data.matrix[i][j] || 0]);
-              emoHeatInst.setOption({
+              if (heatChart.isDisposed && heatChart.isDisposed()) return;
+              heatChart.setOption({
                 tooltip: { formatter: function(p) { return data.emotion_labels[p.value[1]] + ' ' + data.intensity_labels[p.value[0]] + ': ' + p.value[2] + '次'; } },
                 grid: { top: 5, right: 10, bottom: 15, left: 70 },
                 xAxis: { type: 'category', data: data.intensity_labels || [], axisLabel: { fontSize: 9 }, position: 'top' },
                 yAxis: { type: 'category', data: data.emotion_labels || [], axisLabel: { fontSize: 10 } },
                 visualMap: { min: 0, max: Math.max.apply(null, hData.map(function(h) { return h[2]; })) || 10, calculable: true, orient: 'vertical', right: 0, bottom: '15%', inRange: { color: ['#eef2ff', '#c7d2fe', '#818cf8', '#6366f1', '#4338ca'] }, textStyle: { fontSize: 9 } },
                 series: [{ type: 'heatmap', data: hData, label: { show: true, fontSize: 9 }, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.25)' } } }]
-              });
+              }, { notMerge: true });
             }
           }).catch(function() {});
         }
@@ -571,9 +809,33 @@
       const networkGraph = ref(null);
       const networkFilter = ref(['high', 'medium', 'low']);
       const networkCanvas = ref(null);
+      const networkFollowUp = ref(false);
+      const networkVisibleCount = ref(0);
+      const networkSearch = ref('');
+      const networkHover = ref(null);
+      const networkLoading = ref(false);
+      const networkClusterMode = ref('auto');
+      const networkClusterBy = ref('class');
       let networkGraphInst = null;
       let networkGraphCanvasEl = null;
       let networkPoll = null;
+
+      const RISK_LABELS = { high: '高风险', medium: '中风险', low: '低风险' };
+      const RISK_COLORS = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
+      const networkTipStyle = computed(function() {
+        if (!networkHover.value) return {};
+        var x = networkHover.value.x + 16, y = networkHover.value.y - 12;
+        // 防止卡片溢出画布右/下边缘
+        if (networkCanvas.value) {
+          var wrap = networkCanvas.value.parentElement;
+          if (wrap) {
+            var w = wrap.getBoundingClientRect();
+            if (x + 250 > w.width) x = networkHover.value.x - 258;
+            if (y + 110 > w.height) y = w.height - 118;
+          }
+        }
+        return { left: x + 'px', top: Math.max(6, y) + 'px' };
+      });
 
       function jumpToStudentChat(student) {
         if (!student || !student.db_id) return;
@@ -581,6 +843,16 @@
         page.value = 'teacherChat';
         selectTeacherContact(contact);
         Toast.success('已跳转到 ' + student.name + ' 的对话');
+      }
+
+      function onNetworkHover(info) {
+        if (!info) { networkHover.value = null; return; }
+        networkHover.value = {
+          node: info.node,
+          x: info.x, y: info.y,
+          riskLabel: info.node.kind === 'student' ? RISK_LABELS[info.node.risk] : '',
+          riskColor: info.node.kind === 'student' ? RISK_COLORS[info.node.risk] : ''
+        };
       }
 
       function ensureNetworkGraph() {
@@ -592,7 +864,11 @@
         if (window.EmotionNetworkGraph && networkCanvas.value && !networkGraphInst) {
           networkGraphInst = window.EmotionNetworkGraph.create(networkCanvas.value, {
             dark: isDarkMode.value,
-            onStudentClick: jumpToStudentChat
+            clusterMode: networkClusterMode.value,
+            clusterBy: networkClusterBy.value,
+            onStudentClick: jumpToStudentChat,
+            onHover: onNetworkHover,
+            onVisibleChange: function(n) { networkVisibleCount.value = n; }
           });
         }
         if (networkGraphInst && networkGraph.value) {
@@ -602,18 +878,27 @@
       }
 
       async function loadEmotionNetwork() {
+        networkLoading.value = true;
         try {
           var d = await API.get('/network/emotion-graph');
           if (d && d.success && d.data) {
             networkGraph.value = d.data;
             await nextTick();
             var g = ensureNetworkGraph();
-            if (g) g.setSeverityFilter(networkFilter.value.slice());
+            if (g) {
+              g.setSeverityFilter(networkFilter.value.slice());
+              g.setFollowUpMode(networkFollowUp.value);
+              g.setClusterMode(networkClusterMode.value);
+              g.setClusterBy(networkClusterBy.value);
+              if (networkSearch.value) g.setSearchQuery(networkSearch.value);
+            }
           }
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('情绪网络图加载失败', e); }
+        finally { networkLoading.value = false; }
       }
 
       function toggleNetworkFilter(level) {
+        if (networkFollowUp.value && level === 'low') return;
         var i = networkFilter.value.indexOf(level);
         if (i >= 0) {
           if (networkFilter.value.length > 1) networkFilter.value.splice(i, 1);
@@ -624,13 +909,73 @@
         if (g) g.setSeverityFilter(networkFilter.value.slice());
       }
 
+      function setNetworkFollowUp(on) {
+        networkFollowUp.value = !!on;
+        var g = ensureNetworkGraph();
+        if (g) g.setFollowUpMode(networkFollowUp.value);
+      }
+
+      function setNetworkClusterMode(mode) {
+        networkClusterMode.value = mode;
+        var g = ensureNetworkGraph();
+        if (g) g.setClusterMode(mode);
+      }
+
+      function setNetworkClusterBy(by) {
+        networkClusterBy.value = by;
+        var g = ensureNetworkGraph();
+        if (g) g.setClusterBy(by);
+      }
+
+      function onNetworkSearchInput() {
+        var g = ensureNetworkGraph();
+        if (g) g.setSearchQuery(networkSearch.value);
+      }
+
+      function locateNetworkStudent() {
+        if (!networkSearch.value.trim()) return;
+        var g = ensureNetworkGraph();
+        if (g && g.locateFirstMatch()) {
+          Toast.success('已定位到 ' + networkSearch.value.trim());
+        } else {
+          Toast.error('未找到匹配的学生');
+        }
+      }
+
+      function networkZoom(action) {
+        var g = ensureNetworkGraph();
+        if (!g) return;
+        if (action === 'in') g.zoomIn();
+        else if (action === 'out') g.zoomOut();
+        else g.resetView();
+      }
+
       // ==================== Socket.IO ====================
       let socket = null;
       let socketInitTimer = null;
+      let socketLoading = false;
       let dashInterval = null;
       function initSocket() {
         if (socket) return;
         if (typeof io === 'undefined') {
+          if (socketLoading) return;
+          if (window._loadSocketIO) {
+            socketLoading = true;
+            window._loadSocketIO(function() {
+              socketLoading = false;
+              if (typeof io !== 'undefined') {
+                initSocket();
+                if (currentUser.role === 'student') initStudentVideo();
+                if (currentUser.role === 'counselor') initTeacherVideo();
+              } else if (!socketInitTimer) {
+                socketInitTimer = setTimeout(function() {
+                  socketInitTimer = null;
+                  initSocket();
+                }, 3000);
+              }
+            });
+            return;
+          }
           if (!socketInitTimer) {
             socketInitTimer = setTimeout(function() {
               socketInitTimer = null;
@@ -643,19 +988,42 @@
         }
         socket = io({ transports: ['polling', 'websocket'], timeout: 5000, reconnectionAttempts: 3 });
         socket.on('connect', function() { /* connected */ });
-        socket.on('connect_error', function() { /* silent retry */ });
+        socket.on('connect_error', function() { console.warn('Socket连接失败，准备自动重试'); });
         // 视频通话情绪总结落库后，实时刷新情绪网络图
         socket.on('emotion_graph_update', function(data) {
           loadEmotionNetwork();
         });
+        socket.on('alert_created', function(alert) {
+          if (!alert || currentUser.role === 'student') return;
+          loadAlerts();
+          if (alert.risk_level === 'high' || alert.risk_level === 'critical') {
+            Toast.warning('🚨 数字人识别到危机信号：' + (alert.student_name || '未知学生') + '，请立即处理');
+          } else {
+            Toast.info('收到新的风险预警：' + (alert.student_name || '未知学生'));
+          }
+        });
         socket.on('new_message', function(msg) {
+          function existsIn(arr) {
+            return !!(msg && msg.id) && arr.some(function(m) { return m.id === msg.id; });
+          }
           if (page.value === 'teacherChat' && teacherSelected.value) {
-            teacherChatMsgs.value.push(msg);
-            nextTick(function() { if (teacherMsgRef.value) teacherMsgRef.value.scrollTop = teacherMsgRef.value.scrollHeight; });
+            var counselorId = Number(currentUser.user_id || currentUser.id);
+            var studentId = Number(teacherSelected.value.id);
+            var teacherRelevant = true;
+            if (msg.counselor_id !== undefined && msg.counselor_id !== null) teacherRelevant = Number(msg.counselor_id) === counselorId;
+            if (teacherRelevant && msg.student_id !== undefined && msg.student_id !== null) teacherRelevant = Number(msg.student_id) === studentId;
+            if (teacherRelevant && !existsIn(teacherChatMsgs.value)) teacherChatMsgs.value.push(msg);
+            if (teacherRelevant) nextTick(function() { if (teacherMsgRef.value) teacherMsgRef.value.scrollTop = teacherMsgRef.value.scrollHeight; });
           }
           if (page.value === 'studentChat' && selectedContact.value) {
-            chatMessages.value.push(msg);
-            nextTick(function() { if (studentMsgRef.value) studentMsgRef.value.scrollTop = studentMsgRef.value.scrollHeight; });
+            var studentDbId = Number(currentUser.id);
+            var contactCounselorId = Number(selectedContact.value.id);
+            var studentRelevant = true;
+            if (msg.student_id !== undefined && msg.student_id !== null) studentRelevant = Number(msg.student_id) === studentDbId;
+            if (studentRelevant && msg.counselor_id !== undefined && msg.counselor_id !== null) studentRelevant = Number(msg.counselor_id) === contactCounselorId;
+            if (studentRelevant && !existsIn(chatMessages.value)) chatMessages.value.push(msg);
+            if (studentRelevant && msg.sender_type === 'assistant') assistantTyping.value = false;
+            if (studentRelevant) nextTick(function() { if (studentMsgRef.value) studentMsgRef.value.scrollTop = studentMsgRef.value.scrollHeight; });
           }
           loadUnreadCount(); loadMessageContacts();
         });
@@ -677,6 +1045,7 @@
       const newMessage = ref('');
       const studentUnreadCount = ref(0);
       const studentMsgRef = ref(null);
+      const assistantTyping = ref(false);
       const teacherShowEmoji = ref(false);
       const showEmoji = ref(false);
       const guidanceResult = ref(null);
@@ -687,14 +1056,28 @@
         try {
           var d = await API.get('/student/list', { search: studentSearchQuery.value, per_page: 10 });
           studentSearchResults.value = d.data || [];
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('学生搜索失败', e); }
       }, 300);
 
       async function inviteStudent(s) {
         studentSearchQuery.value = ''; studentSearchResults.value = [];
-        try { await API.post('/messages/send', { contact_id: s.id, content: '老师向您发起了对话' }); } catch (e) { /* silent */ }
+        var sentId = Date.now();
+        try {
+          var d = await API.post('/messages/send', { contact_id: s.id, content: '老师向您发起了对话' });
+          if (d && d.data && d.data.id) sentId = d.data.id;
+        } catch (e) {
+          console.error('发起对话失败', e);
+          return;
+        }
         teacherSelected.value = { id: s.id, name: s.name, student_id: s.student_id };
-        teacherChatMsgs.value = [{ id: Date.now(), content: '老师向您发起了对话', sender_type: 'counselor', created_at: new Date().toISOString() }];
+        teacherChatMsgs.value = [{
+          id: sentId,
+          student_id: s.id,
+          counselor_id: currentUser.user_id || currentUser.id,
+          content: '老师向您发起了对话',
+          sender_type: 'counselor',
+          created_at: new Date().toISOString()
+        }];
         loadMessageContacts(); Toast.success('已发起对话');
       }
 
@@ -706,20 +1089,32 @@
           await nextTick();
           if (teacherMsgRef.value) teacherMsgRef.value.scrollTop = teacherMsgRef.value.scrollHeight;
           loadMessageContacts();
-        } catch (e) { /* silent */ }
+        } catch (e) {
+          console.error('加载聊天记录失败', e);
+          teacherChatMsgs.value = [];
+          Toast.error('加载聊天记录失败，请稍后重试');
+        }
       }
 
       async function sendTeacherMsg() {
         if (!teacherNewMsg.value.trim() || !teacherSelected.value) return;
         try {
-          await API.post('/messages/send', { contact_id: teacherSelected.value.id, content: teacherNewMsg.value });
+          var d = await API.post('/messages/send', { contact_id: teacherSelected.value.id, content: teacherNewMsg.value });
           var msg = teacherNewMsg.value;
           teacherNewMsg.value = '';
-          teacherChatMsgs.value.push({ id: Date.now(), content: msg, sender_type: 'counselor', created_at: new Date().toISOString() });
+          var msgId = d && d.data && d.data.id ? d.data.id : Date.now();
+          teacherChatMsgs.value.push({
+            id: msgId,
+            student_id: teacherSelected.value.id,
+            counselor_id: currentUser.user_id || currentUser.id,
+            content: msg,
+            sender_type: 'counselor',
+            created_at: new Date().toISOString()
+          });
           await nextTick();
           if (teacherMsgRef.value) teacherMsgRef.value.scrollTop = teacherMsgRef.value.scrollHeight;
           loadMessageContacts();
-        } catch (e) { Toast.error('发送失败'); }
+        } catch (e) { console.error('发送消息失败', e); }
       }
 
       async function analyzeCounselorGuidance() {
@@ -764,55 +1159,98 @@
             topic: '日常谈心'
           });
           if (d && d.success && d.data) {
+            if (window._loadMarkdown) await window._loadMarkdown();
             talkReport.value = d.data.report || null;
             Toast.success('谈心记录已生成并归档到学生档案');
           } else {
             Toast.error(d.message || '生成失败');
           }
-        } catch (e) { Toast.error('生成失败'); }
+        } catch (e) { console.error('生成谈心记录失败', e); }
         talkReportLoading.value = false;
+      }
+
+      function printTalkReport() {
+        if (!talkReport.value) return;
+        var openPrint = function() {
+          var html = Helpers.renderMd(talkReport.value.summary || '');
+          var printWindow = window.open('', '_blank', 'width=860,height=1000');
+          if (!printWindow) {
+            Toast.error('浏览器拦截了打印窗口，请允许本站弹出窗口后重试');
+            return;
+          }
+          printWindow.document.write(
+            '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">' +
+            '<title>谈心记录报告</title><style>' +
+            'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1e293b;background:#fff;margin:0;padding:32px;line-height:1.75}' +
+            '.report{max-width:820px;margin:0 auto}h1,h2,h3{color:#4f46e5;line-height:1.35}' +
+            'p,li{font-size:14px}@media print{body{padding:0}}' +
+            '</style></head><body><div class="report">' + html + '</div>' +
+            '<script>window.onload=function(){window.print();};</' + 'script></body></html>'
+          );
+          printWindow.document.close();
+        };
+        if (window._loadMarkdown) {
+          window._loadMarkdown(openPrint);
+        } else {
+          openPrint();
+        }
       }
 
       async function loadMessageContacts() {
         try { var d = await API.get('/messages/contacts'); messageContacts.value = d.data || []; }
-        catch (e) { /* silent */ }
+        catch (e) { console.warn('联系人列表加载失败', e); }
+        if (currentUser.role === 'student' && selectedContact.value) {
+          loadContactPresence(selectedContact.value.id);
+        }
       }
 
-      async function selectContactHandler(contact) {
-        if (selectedContact.value && socket) { socket.emit('leave', { room: 'chat_' + selectedContact.value.id }); }
+      async function selectContactHandler(contact, keepTyping) {
+        if (!keepTyping) assistantTyping.value = false;
+        if (selectedContact.value && socket) {
+          socket.emit('leave', { room: 'student_chat_' + currentUser.id + '_' + selectedContact.value.id });
+        }
         selectedContact.value = contact;
-        if (socket) { socket.emit('join', { room: 'chat_' + contact.id }); }
+        if (socket) { socket.emit('join', { room: 'student_chat_' + currentUser.id + '_' + contact.id }); }
+        if (currentUser.role === 'student') loadContactPresence(contact.id);
         try {
           var d = await API.get('/messages/' + contact.id);
           chatMessages.value = (d.data || []).reverse();
+          if (keepTyping) {
+            var ordered = chatMessages.value;
+            var latest = ordered[ordered.length - 1];
+            if (latest && latest.sender_type === 'assistant') assistantTyping.value = false;
+          }
           await nextTick();
           if (studentMsgRef.value) studentMsgRef.value.scrollTop = studentMsgRef.value.scrollHeight;
           loadMessageContacts();
-        } catch (e) { /* silent */ }
+        } catch (e) {
+          console.error('加载聊天记录失败', e);
+          chatMessages.value = [];
+          Toast.error('加载聊天记录失败，请稍后重试');
+        }
       }
 
       async function sendStudentMsg() {
         if (!newMessage.value.trim() || !selectedContact.value) return;
         try {
           var d = await API.post('/messages/send', { contact_id: selectedContact.value.id, content: newMessage.value });
-          if (socket && d.success) {
-            socket.emit('send_message', {
-              room: 'chat_' + selectedContact.value.id,
-              message: { id: d.data ? d.data.id : null, content: newMessage.value, sender_type: 'student', created_at: new Date().toISOString() }
-            });
-          }
+          var pending = !!(d && d.data && d.data.ai_reply_pending);
+          if (pending) assistantTyping.value = true;
           newMessage.value = '';
-          selectContactHandler(selectedContact.value);
-        } catch (e) { Toast.error('发送失败'); }
+          await selectContactHandler(selectedContact.value, pending);
+        } catch (e) { console.error('发送消息失败', e); }
       }
 
       async function loadUnreadCount() {
         try { var d = await API.get('/messages/unread'); var c = d.data ? d.data.unread_count : 0; studentUnreadCount.value = c; }
-        catch (e) { /* silent */ }
+        catch (e) { console.warn('未读消息数加载失败', e); }
       }
 
       function insertEmoji(e) { newMessage.value += e; showEmoji.value = false; }
       function insertTeacherEmoji(e) { teacherNewMsg.value += e; teacherShowEmoji.value = false; }
+
+      // ==================== AI 数字人 ====================
+      const dh = window.DigitalHumanModule.setup({ API, Toast, currentUser });
 
       // ==================== WebRTC 视频通话 ====================
       const localVideo = ref(null), remoteVideo = ref(null);
@@ -1097,6 +1535,9 @@
       // ===== 教师端 WebRTC =====
       function initTeacherVideo() {
         if (!socket || teacherVideoListenersSet) return; teacherVideoListenersSet = true;
+        if (currentUser.role === 'counselor' && (currentUser.user_id || currentUser.id)) {
+          socket.emit('join', { room: 'teacher_chat_' + (currentUser.user_id || currentUser.id) });
+        }
         socket.on('incoming_video_call', function(data) {
           if (data.caller !== 'student') return;
           incomingCall.value = data;
@@ -1609,7 +2050,7 @@
             var faceResult = await FaceEmotionDetector.detect(videoEl);
             if (faceResult && yoloCanvas.value) {
               try { FaceEmotionDetector.drawOverlay(yoloCanvas.value, videoEl, faceResult); }
-              catch (e) { /* silent */ }
+              catch (e) { console.warn('人脸情绪覆盖层绘制失败', e); }
             }
             if (window.FaceEmotionDetector && FaceEmotionDetector.getDiagnostics) updateVisionDiag(FaceEmotionDetector.getDiagnostics());
             refreshRealtimeEmotion(faceResult || null);
@@ -1692,7 +2133,7 @@
               if (yoloAlerts.value.length > 50) yoloAlerts.value = yoloAlerts.value.slice(0, 50);
             }
           }
-        } catch (e) { /* silent */ }
+        } catch (e) { console.warn('服务端人脸情绪检测失败', e); }
       }
 
       function toggleYolo() { if (yoloActive.value) stopYolo(); else startYolo(); }
@@ -1732,137 +2173,37 @@
 
       async function loadYoloLogs() {
         try { var d = await API.get('/emotion/yolo-logs', { limit: 20 }); if (d.data) yoloAlerts.value = d.data; }
-        catch (e) { /* silent */ }
+        catch (e) { console.warn('实时情绪日志加载失败', e); }
       }
 
       // ==================== 预约 ====================
-      const appointments = ref([]);
-      const counselors = ref([]);
-      const newAppointment = reactive({ counselor_id: '', appointment_time: '', reason: '' });
-      async function loadAppointments() {
-        try { var d = await API.get('/appointments'); appointments.value = d.data || []; }
-        catch (e) { /* silent */ }
-      }
-      async function createAppointment() {
-        if (!newAppointment.counselor_id || !newAppointment.appointment_time) { Toast.error('请选择辅导员和预约时间'); return; }
-        try {
-          await API.post('/appointments/create', newAppointment);
-          Toast.success('预约创建成功');
-          newAppointment.counselor_id = ''; newAppointment.appointment_time = ''; newAppointment.reason = '';
-          loadAppointments();
-        } catch (e) { Toast.error('预约失败'); }
-      }
-      async function loadCounselors() {
-        try { var d = await API.get('/counselors/list'); counselors.value = d.data || []; }
-        catch (e) { /* silent */ }
-      }
+      const appointmentMod = window.AppointmentsModule.setup({ API, Toast, loadReminders });
 
       // ==================== 心理测评 ====================
-      const assessmentStep = ref(0);
-      const assessmentOptions = ['完全不会', '几天', '一半以上', '几乎每天'];
-      const phq9Questions = [
-        { text: '做事时提不起劲或没有兴趣' }, { text: '感到心情低落、沮丧或绝望' },
-        { text: '入睡困难、睡不安稳或睡眠过多' }, { text: '感觉疲倦或没有活力' },
-        { text: '食欲不振或吃太多' }, { text: '觉得自己很糟，或觉得自己很失败' },
-        { text: '对事物专注有困难，例如阅读或看电视' }, { text: '动作或说话速度缓慢到别人已经觉察，或正好相反' },
-        { text: '有不如死掉或用某种方式伤害自己的念头' }
-      ];
-      const gad7Questions = [
-        { text: '感觉紧张、焦虑或急切' }, { text: '不能够停止或控制担忧' },
-        { text: '对各种各样的事情担忧过多' }, { text: '很难放松下来' },
-        { text: '由于不安而无法静坐' }, { text: '变得容易烦恼或急躁' },
-        { text: '感到似乎将有可怕的事情发生' }
-      ];
-      const isiQuestions = [
-        { text: '入睡困难的程度' }, { text: '夜间易醒或早醒的程度' },
-        { text: '比期望的时间早醒的程度' }, { text: '对自己的睡眠状况是否满意' },
-        { text: '睡眠问题对日间功能的影响程度' }, { text: '他人是否注意到你的睡眠问题' },
-        { text: '对睡眠问题的担忧程度' }
-      ];
-      const assessmentAnswers = ref(Array(23).fill(-1));
-      const assessmentSubmitting = ref(false);
-      const assessmentResult = ref(null);
-      const assessmentHistory = ref([]);
-      const assessStartTime = ref(0);
+      const assessmentMod = window.AssessmentModule.setup({ API, Toast, currentUser, page, loadMessageContacts });
 
-      const assessmentProgress = computed(function() {
-        var answered = assessmentAnswers.value.filter(function(a) { return a >= 0; }).length;
-        return Math.round(answered / 23 * 100);
-      });
+      const {
+        dhSettings, dhLogs, dhPreviewMsgs, dhPreviewInput, dhPreviewLoading,
+        dhQuickQs, dhVoiceEnabled, contactPresence,
+        loadDigitalHuman, saveDigitalHuman, loadDigitalHumanLogs, markDigitalHumanLogHandled,
+        askDigitalHuman, speakDigitalHuman, stopDigitalHumanSpeech,
+        loadContactPresence, startPresencePing, stopPresencePing
+      } = dh;
 
-      const assessmentStepLabel = computed(function() {
-        return ['一、抑郁状态 (PHQ-9)', '二、焦虑状态 (GAD-7)', '三、睡眠状态 (ISI)'][assessmentStep.value] || '';
-      });
+      const {
+        appointments, counselors, newAppointment, appointmentFilter,
+        appointmentNotes, updatingAppointmentId,
+        loadAppointments, setAppointmentFilter, createAppointment,
+        updateAppointmentStatus, loadCounselors
+      } = appointmentMod;
 
-      const currentStepQuestions = computed(function() {
-        if (assessmentStep.value === 0) return phq9Questions;
-        if (assessmentStep.value === 1) return gad7Questions;
-        return isiQuestions;
-      });
-
-      const currentStepStart = computed(function() {
-        return assessmentStep.value === 0 ? 0 : assessmentStep.value === 1 ? 9 : 16;
-      });
-
-      function canProceedToNext() {
-        var start = currentStepStart.value;
-        var end = start + currentStepQuestions.value.length;
-        for (var i = start; i < end; i++) {
-          if (assessmentAnswers.value[i] < 0) return false;
-        }
-        return true;
-      }
-
-      function goToNextStep() {
-        if (!canProceedToNext()) { Toast.warning('请完成当前部分的所有题目'); return; }
-        if (assessmentStep.value < 2) assessmentStep.value++;
-      }
-
-      function goToPrevStep() {
-        if (assessmentStep.value > 0) assessmentStep.value--;
-      }
-
-      function initAssessment() {
-        assessmentAnswers.value = Array(23).fill(-1);
-        assessmentResult.value = null;
-        assessmentStep.value = 0;
-        assessStartTime.value = Date.now();
-        loadAssessmentHistory();
-      }
-
-      async function submitAssessment() {
-        var duration = Math.floor((Date.now() - assessStartTime.value) / 1000);
-        assessmentSubmitting.value = true;
-        var answers = [];
-        for (var i = 0; i < 23; i++) { answers.push({ q: i + 1, a: assessmentAnswers.value[i] }); }
-        try {
-          var d = await API.post('/assessment/submit', { answers: answers, duration_seconds: duration });
-          if (d.success) { assessmentResult.value = d.data; loadAssessmentHistory(); Toast.success('测评完成'); }
-          else { Toast.error(d.message || '提交失败'); }
-        } catch (e) { Toast.error('提交失败'); }
-        assessmentSubmitting.value = false;
-      }
-
-      function resetAssessment() { assessmentResult.value = null; initAssessment(); }
-
-      async function crisisReport() {
-        if (!confirm('确认要上报心理危机吗？辅导员与心理中心将尽快联系你。\n\n如有紧急危险，请立即拨打 120 / 110 或心理援助热线 400-161-9995。')) return;
-        try {
-          var d = await API.post('/crisis/report', { reason: '学生主动求助' });
-          if (d && d.success) {
-            Toast.success(d.message || '危机已上报');
-            if (d.data && d.data.hotline) Toast.info('📞 ' + d.data.hotline);
-            if (currentUser.role === 'student') { page.value = 'studentChat'; loadMessageContacts(); }
-          } else {
-            Toast.error(d.message || '上报失败');
-          }
-        } catch (e) { Toast.error('上报失败，请稍后重试'); }
-      }
-
-      async function loadAssessmentHistory() {
-        try { var d = await API.get('/assessment/history'); assessmentHistory.value = d.data || []; }
-        catch (e) { /* silent */ }
-      }
+      const {
+        assessmentStep, assessmentOptions, assessmentProgress, assessmentStepLabel,
+        phq9Questions, gad7Questions, isiQuestions, currentStepQuestions, currentStepStart,
+        assessmentAnswers, assessmentSubmitting, assessmentResult, assessmentHistory,
+        initAssessment, submitAssessment, resetAssessment, loadAssessmentHistory,
+        crisisReport, canProceedToNext, goToNextStep, goToPrevStep
+      } = assessmentMod;
 
       // ==================== 学生端 Widget ====================
       const QUOTES = [
@@ -1903,6 +2244,85 @@
         return h < 6 ? '夜深了，注意休息 🌙' : h < 9 ? '早上好 ☀️' : h < 12 ? '上午好 🌤️' : h < 14 ? '中午好 ☀️' : h < 18 ? '下午好 🌈' : '晚上好 🌙';
       });
 
+      const studentTrendChart = ref(null);
+      const studentTrendLoading = ref(false);
+      const studentTrendData = ref([]);
+      const studentTrendSummary = reactive({ total: 0, avgIntensity: 0, highCount: 0 });
+      let studentTrendInst = null;
+
+      function renderStudentTrend() {
+        if (typeof echarts === 'undefined') {
+          window._loadECharts && window._loadECharts(renderStudentTrend);
+          return;
+        }
+        if (!studentTrendChart.value) return;
+        studentTrendInst = ensureChart(studentTrendInst, studentTrendChart.value, isDarkMode.value);
+        var data = studentTrendData.value || [];
+        var labels = data.map(function(item) { return item.date || item.day || ''; });
+        var values = data.map(function(item) { return Number(item.avg_intensity || 0); });
+        studentTrendInst.setOption({
+          tooltip: {
+            trigger: 'axis',
+            formatter: function(params) {
+              var p = params && params[0];
+              if (!p) return '';
+              return p.axisValue + '<br/>平均情绪强度：' + (p.value || 0) + '/10';
+            }
+          },
+          grid: { top: 20, right: 18, bottom: 28, left: 42 },
+          xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 10 } },
+          yAxis: { type: 'value', min: 0, max: 10, interval: 2, axisLabel: { fontSize: 10 } },
+          series: [{
+            name: '平均情绪强度',
+            type: 'line',
+            smooth: true,
+            data: values,
+            symbol: 'circle',
+            symbolSize: 7,
+            lineStyle: { color: '#6366f1', width: 3 },
+            itemStyle: { color: '#6366f1' },
+            areaStyle: {
+              color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                  { offset: 0, color: 'rgba(99,102,241,0.32)' },
+                  { offset: 1, color: 'rgba(99,102,241,0.02)' }
+                ]
+              }
+            }
+          }]
+        }, { notMerge: true });
+      }
+
+      async function loadStudentTrend() {
+        if (currentUser.role !== 'student') return;
+        studentTrendLoading.value = true;
+        try {
+          var d = await API.get('/emotion/trends', { days: 14, student_id: currentUser.id });
+          var rows = (d && d.data) ? d.data : [];
+          studentTrendData.value = rows;
+          var total = 0, avgSum = 0, avgCount = 0, highCount = 0;
+          rows.forEach(function(item) {
+            var count = Number(item.count || 0);
+            var avg = Number(item.avg_intensity || 0);
+            total += count;
+            if (avg) { avgSum += avg; avgCount += 1; }
+            if (avg >= 7) highCount += 1;
+          });
+          studentTrendSummary.total = total;
+          studentTrendSummary.avgIntensity = avgCount ? Math.round((avgSum / avgCount) * 10) / 10 : 0;
+          studentTrendSummary.highCount = highCount;
+          nextTick(renderStudentTrend);
+        } catch (e) {
+          studentTrendData.value = [];
+          studentTrendSummary.total = 0;
+          studentTrendSummary.avgIntensity = 0;
+          studentTrendSummary.highCount = 0;
+        } finally {
+          studentTrendLoading.value = false;
+        }
+      }
+
       function loadWater() { var today = new Date().toISOString().split('T')[0]; var saved = localStorage.getItem('water_' + today); waterCount.value = saved ? parseInt(saved) : 0; }
       function addWater() {
         if (waterCount.value < 8) { waterCount.value++; var today = new Date().toISOString().split('T')[0]; localStorage.setItem('water_' + today, waterCount.value); Toast.success('+1 杯水！继续加油 💧'); }
@@ -1937,8 +2357,10 @@
               page.value = 'dashboard';
               loadDash();
               loadWorkplan();
+              loadAppointments();
               dashInterval = setInterval(loadDash, 30000);
               setTimeout(function(){ initSocket(); initTeacherVideo(); }, 0);
+              if (currentUser.role === 'counselor') startPresencePing();
             }
           }
         }
@@ -1947,18 +2369,21 @@
       });
 
       watch(page, function(p) {
+        stopDigitalHumanSpeech();
         if (dashInterval) { clearInterval(dashInterval); dashInterval = null; }
         if (networkPoll) { clearInterval(networkPoll); networkPoll = null; }
         if (p === 'dashboard') { loadWorkplan(); dashInterval = setInterval(loadDash, 30000); }
-        if (p === 'studentHome') { /* 首页纯本地渲染，无需API */ }
+        if (p === 'studentHome') { loadStudentTrend(); }
         if (p === 'students') loadStudents();
         if (p === 'reminders') loadReminders();
         if (p === 'emotionBoard') { loadEmotionDashboard(); dashInterval = setInterval(loadEmotionDashboard, 60000); }
         if (p === 'emotionNetwork') { loadEmotionNetwork(); networkPoll = setInterval(loadEmotionNetwork, 15000); }
         if (p === 'alerts') loadAlerts();
+        if (p === 'knowledge') loadKnowledge();
         if (p === 'teacherChat') { initSocket(); loadMessageContacts(); initTeacherVideo(); loadYoloLogs(); }
         if (p === 'studentChat') { initSocket(); initStudentVideo(); loadMessageContacts(); }
         if (p === 'studentAppointment') { loadCounselors(); loadAppointments(); }
+        if (p === 'teacherAppointments') loadAppointments();
       });
 
       async function loadStudentData() {
@@ -1967,7 +2392,7 @@
         loadUnreadCount();
         if (!counselors.value.length) {
           try { var d = await API.get('/counselors/list'); counselors.value = d.data || []; }
-          catch (e) { console.warn("API silent error:", e); }
+          catch (e) { console.warn("辅导员列表加载失败:", e); }
         }
       }
 
@@ -2032,29 +2457,44 @@
         // 仪表盘
         dash, recentAlerts, loadDash, cPie, cTrend, cRisk, renderCharts,
         // 学生管理
-        students, studentSearch, showAddStudent, newStudent, selectedStudent, studentProfiles,
+        students, studentsLoading, studentSearch, showAddStudent, newStudent, selectedStudent, studentProfiles,
+        studentRiskTimeline, studentRiskTimelineLoading, showStudentRiskTimeline, manualRiskLevel, manualRiskReason,
         loadStudents, addStudent, viewStudent, updateStudentNotes, searchStudentsHandler,
+        loadStudentRiskTimeline, toggleStudentRiskTimeline, adjustStudentRisk,
         // 预警
-        alerts, loadAlerts, ackAlert,
+        alerts, alertsLoading, alertStatusFilter, crisisOnly, alertStatusCounts, filteredAlerts,
+        loadAlerts, toggleCrisisOnly, ackAlert, escalateAlert, resolvingAlert, resolveNote, resolveSubmitting,
+        openResolveAlert, closeResolveAlert, submitResolveAlert,
+        crisisCounselors, assigningCrisisAlert, crisisAssignTo, crisisAssignSubmitting,
+        openAssignCrisisAlert, closeAssignCrisisAlert, submitAssignCrisisAlert, closeCrisisAlert,
         // 提醒
         reminders, showCompleted, loadReminders, completeReminder,
         // 班会/公文
         meetingTheme, meetingResult, meetingLoading, generateMeeting,
         docType, docContent, docResult, docLoading, generateDoc,
         // 知识库
-        kbStats, loadKbStats, uploadDoc,
+        kbStats, kbDocs, kbLoading, kbDeleting, loadKbStats, loadKnowledge, uploadDoc, deleteKbDoc,
         // 情绪看板
-        emoDashStats, emoDashAlerts, realtimeEmotionLogs, emoPieChart, emoRiskChart, emoTrendChart, emoHeatmapChart,
+        emoDashStats, emoDashAlerts, realtimeEmotionLogs, emoBoardLoading,
+        emoPieChart, emoRiskChart, emoTrendChart, emoHeatmapChart,
         loadEmotionDashboard, seedRealtimeDemoData,
         // 情绪网络图
-        networkGraph, networkFilter, networkCanvas, loadEmotionNetwork, toggleNetworkFilter,
+        networkGraph, networkFilter, networkCanvas, networkLoading, loadEmotionNetwork, toggleNetworkFilter,
+        networkFollowUp, networkVisibleCount, networkSearch, networkHover, networkTipStyle,
+        networkClusterMode, networkClusterBy,
+        setNetworkFollowUp, setNetworkClusterMode, setNetworkClusterBy,
+        onNetworkSearchInput, locateNetworkStudent, networkZoom,
+        // AI 数字人
+        dhSettings, dhLogs, dhPreviewMsgs, dhPreviewInput, dhPreviewLoading, dhQuickQs, dhVoiceEnabled,
+        loadDigitalHuman, saveDigitalHuman, loadDigitalHumanLogs, markDigitalHumanLogHandled,
+        askDigitalHuman, contactPresence, speakDigitalHuman, stopDigitalHumanSpeech,
         // 通讯
         messageContacts, teacherSelected, teacherChatMsgs, teacherNewMsg, teacherUnreadCount, teacherMsgRef,
         studentSearchQuery, studentSearchResults, searchStudentsHandler, inviteStudent,
         selectTeacherContact, sendTeacherMsg, guidanceResult, guidanceLoading, analyzeCounselorGuidance,
-        fillTeacherMsg, guidanceRiskTagStyle, talkReport, talkReportLoading, generateTalkReport,
+        fillTeacherMsg, guidanceRiskTagStyle, talkReport, talkReportLoading, generateTalkReport, printTalkReport,
         selectedContact, chatMessages, newMessage, studentUnreadCount, studentMsgRef,
-        loadMessageContacts, selectContactHandler, sendStudentMsg, loadUnreadCount,
+        assistantTyping, loadMessageContacts, selectContactHandler, sendStudentMsg, loadUnreadCount,
         insertEmoji, insertTeacherEmoji, teacherShowEmoji, showEmoji, emojiList,
         openTeacherVideo, autoResize,
         // WebRTC 学生端
@@ -2071,7 +2511,8 @@
         toggleYolo, startYolo, stopYolo, loadYoloLogs,
         yoloEmotionShow, yoloEmotionDisplay, realtimeCallSummary,
         // 预约
-        appointments, counselors, newAppointment, loadAppointments, createAppointment,
+        appointments, counselors, newAppointment, appointmentFilter, appointmentNotes, updatingAppointmentId,
+        loadAppointments, setAppointmentFilter, createAppointment, updateAppointmentStatus,
         // 测评
         assessmentStep, assessmentOptions, assessmentProgress, assessmentStepLabel,
         phq9Questions, gad7Questions, isiQuestions, currentStepQuestions, currentStepStart,
@@ -2082,6 +2523,7 @@
         waterCount, waterProgress, addWater, resetWater,
         dailyQuote, dailyWord, todayMood, todayMoodText,
         loadMood, recordMood, todayStr, greetingText,
+        studentTrendChart, studentTrendLoading, studentTrendSummary, loadStudentTrend,
         // 工具
         Icons, Helpers,
         exportData, reSeedData
