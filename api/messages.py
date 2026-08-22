@@ -1,4 +1,4 @@
-from core.digital_human import generate_reply, digital_human_status
+from core.digital_human import generate_reply_result, digital_human_status
 
 from api import common
 from api.common import *  # noqa: F401,F403
@@ -9,6 +9,40 @@ from api.common import (
     _validate_password_strength,
     _fallback_knowledge_search,
 )
+from core.text_emotion import classify_local_text_emotion
+
+
+def _normalize_digital_human_history(items):
+    """把前端或数据库消息整理为 generate_reply_result 能识别的上下文。"""
+    if not isinstance(items, list):
+        return []
+    history = []
+    for item in items[-8:]:
+        if not isinstance(item, dict):
+            continue
+        content = (item.get("content") or "").strip()
+        if not content:
+            continue
+        sender = item.get("sender_type") or item.get("role") or ""
+        role = "assistant" if sender in ("assistant", "counselor", "ai") else "user"
+        history.append({"role": role, "content": content})
+    return history
+
+
+def _build_message_history(student_id, counselor_id, exclude_message_id):
+    """从消息表读取最近几轮，作为数字人短期记忆。"""
+    try:
+        result = common.db.get_conversation_messages(
+            student_id, counselor_id, page=1, per_page=8
+        )
+        items = [
+            item for item in (result.get("items") or [])
+            if item.get("id") != exclude_message_id
+        ]
+        items.reverse()
+        return _normalize_digital_human_history(items)
+    except Exception:
+        return []
 
 # ===================================================================
 # 即时通讯 API
@@ -112,6 +146,10 @@ def send_message():
                 student = common.db.get_student_by_id(student_id) or {}
                 student_name = student.get("name") or ""
                 student_class = student.get("class_name") or ""
+                student_context = {
+                    "risk_level": student.get("risk_level") or "",
+                    "emotion_status": student.get("emotion_status") or "",
+                }
                 delay = max(0, min(int(settings.get("delay") or 0), 10))
                 ai_reply_pending = True
 
@@ -119,7 +157,17 @@ def send_message():
                     try:
                         if delay:
                             time.sleep(delay)
-                        reply, crisis = generate_reply(content, settings, student_name)
+                        history = _build_message_history(student_id, counselor_id, msg_id)
+                        result = generate_reply_result(
+                            content,
+                            settings,
+                            student_name,
+                            history=history,
+                            student_context=student_context,
+                        )
+                        reply = result.content
+                        crisis = result.crisis
+                        crisis_level = result.crisis_level
                         reply_id = common.db.create_message(
                             student_id=student_id,
                             counselor_id=counselor_id,
@@ -135,16 +183,24 @@ def send_message():
                             message_id=msg_id,
                             content=reply,
                             crisis=crisis,
+                            crisis_level=crisis_level,
+                            triggered_keywords=result.triggered_keywords,
                         )
-                        if crisis:
+                        if crisis_level >= 2:
                             try:
+                                if crisis_level >= 3:
+                                    risk_level = "critical"
+                                    description = "数字人对话中识别到紧急危机信号：{}".format(content[:200])
+                                else:
+                                    risk_level = "high"
+                                    description = "数字人对话中识别到高风险语义信号：{}".format(content[:200])
                                 alert_id = common.db.create_alert(
                                     student_name=student_name,
                                     student_class=student_class,
-                                    risk_level="high",
+                                    risk_level=risk_level,
                                     emotion_type="危机",
                                     intensity=10,
-                                    description="数字人对话中识别到自伤/危机信号：{}".format(content[:200]),
+                                    description=description,
                                     assigned_to=counselor_id,
                                     student_id=student_id,
                                 )
@@ -202,7 +258,8 @@ def get_digital_human_logs():
     try:
         status = request.args.get("status")
         logs = common.db.get_digital_human_logs(g.user_id, status=status)
-        return jsonify({"success": True, "data": logs}), 200
+        summary = common.db.get_digital_human_summary(g.user_id)
+        return jsonify({"success": True, "data": logs, "summary": summary}), 200
     except Exception as exc:
         logger.error("获取数字人日志失败: %s", exc)
         return jsonify({"success": False, "message": "获取数字人日志失败"}), 500
@@ -234,10 +291,21 @@ def preview_digital_human():
     try:
         settings = common.db.get_digital_human_settings(g.user_id)
         student_name = "同学"
-        reply, crisis = generate_reply(data["message"], settings, student_name)
+        history = _normalize_digital_human_history(data.get("history") or [])
+        result = generate_reply_result(
+            data["message"],
+            settings,
+            student_name,
+            history=history,
+        )
         return jsonify({
             "success": True,
-            "data": {"reply": reply, "crisis": crisis},
+            "data": {
+                "reply": result.content,
+                "crisis": result.crisis,
+                "crisis_level": result.crisis_level,
+                "emotion": result.emotion,
+            },
         }), 200
     except Exception as exc:
         logger.error("数字人试聊失败: %s", exc)
@@ -345,28 +413,8 @@ def analyze_message_emotion():
 
 
 def _local_text_emotion(text):
-    """本地关键词情绪分析（无需API）"""
-    keywords = {
-        "焦虑": ["焦虑", "担心", "紧张", "不安", "压力", "崩溃", "受不了"],
-        "悲伤": ["难过", "伤心", "哭了", "失去", "痛苦", "绝望", "想死", "自杀"],
-        "愤怒": ["生气", "愤怒", "讨厌", "恨", "不公平", "凭什么", "滚"],
-        "恐惧": ["害怕", "恐惧", "恐怖", "吓", "噩梦", "不敢"],
-        "压抑": ["压抑", "憋着", "没人理解", "孤独", "寂寞", "一个人"],
-        "低落": ["低落", "没意思", "无聊", "懒得", "不想动", "好累", "没劲"],
-        "高兴": ["开心", "高兴", "哈哈", "太好了", "棒", "喜欢", "谢谢老师"],
-        "正常": ["好的", "收到", "知道", "嗯", "谢谢"],
-    }
-    scores = {}
-    for emotion, words in keywords.items():
-        score = sum(1 for w in words if w in text)
-        if score > 0:
-            scores[emotion] = score
-    if not scores:
-        return {"emotion": "正常", "risk": "low", "intensity": 1, "keywords": [], "suggestion": ""}
-    top = max(scores, key=scores.get)
-    risk = "high" if top in ("悲伤","恐惧","压抑") and scores[top] >= 2 else ("medium" if top in ("焦虑","愤怒","低落") else "low")
-    intensity = min(10, scores[top] * 3 + 2)
-    return {"emotion": top, "risk": risk, "intensity": intensity, "keywords": [], "suggestion": "建议关注学生情绪状态" if risk != "low" else ""}
+    """本地关键词情绪分析（无需 API，逻辑集中在 core.text_emotion）。"""
+    return classify_local_text_emotion(text)
 
 
 

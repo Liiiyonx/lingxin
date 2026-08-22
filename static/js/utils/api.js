@@ -53,7 +53,11 @@ window.API = (function() {
     }
 
     let data;
-    try { data = await res.json(); } catch (e) { data = null; }
+    try { data = await res.json(); } catch (e) {
+      var parseMsg = '服务器返回数据异常，请稍后重试';
+      reportCriticalFailure(path, parseMsg, function() { return request(path, opts); });
+      throw new Error(parseMsg);
+    }
 
     if (!res.ok) {
       var msg = (data && data.message) ? data.message : ('请求失败 (HTTP ' + res.status + ')');
@@ -83,8 +87,19 @@ window.API = (function() {
       try {
         var r = await fetch(BASE + path, { method: 'POST', headers: headers, body: JSON.stringify(body) });
         if (r.status === 401) { emitter.emit('unauthorized'); return null; }
-        return await r.json();
+        var data;
+        try { data = await r.json(); } catch (e) {
+          console.warn('[API] silent response is not JSON:', path, e);
+          return null;
+        }
+        if (!r.ok) {
+          var msg = (data && data.message) ? data.message : ('请求失败 (HTTP ' + r.status + ')');
+          console.warn('[API] silent request failed:', path, msg);
+          return null;
+        }
+        return data;
       } catch (e) {
+        console.warn('[API] silent request network error:', path, e);
         return null;
       }
     },

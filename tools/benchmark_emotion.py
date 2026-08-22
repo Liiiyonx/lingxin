@@ -23,56 +23,50 @@ import argparse
 import json
 import os
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
-# 内置文本示例样本（label -> 例句列表），用于演示评测框架，可替换为真实标注数据
+# 内置小样本人为标注评测集，刻意混入口语、歧义和短句，避免“全对但无区分度”。
 BUILTIN_TEXT_SAMPLES = [
     ("正常", "好的，收到，谢谢老师。"),
-    ("正常", "知道了，我会按时完成的。"),
+    ("正常", "我知道了，今晚会早点睡。"),
+    ("正常", "老师，这题我不太会，能再讲一遍吗？"),
+    ("正常", "最近事情有点多，但我觉得还能安排好。"),
+    ("正常", "我担心今天下雨，记得带伞。"),
+    ("正常", "我不想动，所以周末就在宿舍休息。"),
     ("高兴", "太好了，我通过了考试，好开心！"),
     ("高兴", "哈哈，这次活动太棒了，我特别喜欢。"),
+    ("高兴", "今天和朋友聊得很开心，感觉轻松多了。"),
     ("焦虑", "我最近压力特别大，总觉得时间不够用，很担心考不好。"),
     ("焦虑", "马上要答辩了，我紧张得睡不着觉，心里很不安。"),
+    ("焦虑", "我担心自己跟不上进度。"),
     ("悲伤", "我奶奶去世了，我真的好难过，每天都在哭。"),
     ("悲伤", "失去了最好的朋友，心里好痛苦。"),
+    ("悲伤", "我觉得没人真的在乎我，活着没有意义。"),
+    ("悲伤", "我感觉好绝望，好像没人能帮我。"),
     ("愤怒", "这太不公平了！凭什么这样对我，我真的很生气。"),
     ("愤怒", "我讨厌这种被人欺负的感觉，恨不得马上发作。"),
+    ("愤怒", "凭什么每次都是我背锅。"),
+    ("愤怒", "他们总是故意针对我，我快气炸了。"),
     ("恐惧", "我每天晚上都做噩梦，很害怕一个人待着。"),
     ("恐惧", "不敢去人多的地方，一想到就浑身发抖。"),
+    ("恐惧", "我一到考试就发慌，手心冒汗。"),
     ("压抑", "没人理解我，感觉特别孤独，一直憋着。"),
     ("压抑", "我总是一个人扛着，越来越觉得喘不过气。"),
+    ("压抑", "白天装没事，晚上却经常睡不着。"),
+    ("压抑", "心里像压了一块石头，越来越累。"),
     ("低落", "最近什么都不想干，觉得好累，提不起劲。"),
     ("低落", "每天都好没意思，懒得动，也不想说话。"),
+    ("低落", "我最近上课老走神，但下课又没精神。"),
 ]
 
-# 关键词情绪分类器（与 api/routes.py 的 _local_text_emotion 逻辑一致）
-_KEYWORDS = {
-    "焦虑": ["焦虑", "担心", "紧张", "不安", "压力", "崩溃", "受不了"],
-    "悲伤": ["难过", "伤心", "哭了", "失去", "痛苦", "绝望", "想死", "自杀"],
-    "愤怒": ["生气", "愤怒", "讨厌", "恨", "不公平", "凭什么", "滚"],
-    "恐惧": ["害怕", "恐惧", "恐怖", "吓", "噩梦", "不敢"],
-    "压抑": ["压抑", "憋着", "没人理解", "孤独", "寂寞", "一个人"],
-    "低落": ["低落", "没意思", "无聊", "懒得", "不想动", "好累", "没劲"],
-    "高兴": ["开心", "高兴", "哈哈", "太好了", "棒", "喜欢"],
-    "正常": ["好的", "收到", "知道", "嗯", "谢谢"],
-}
+from core.text_emotion import classify_local_text_emotion
 
 
-def keyword_classify(text: str) -> str:
-    """关键词情绪分类（确定性，用于文本评测基线）。"""
-    scores = Counter()
-    for emotion, words in _KEYWORDS.items():
-        scores[emotion] = sum(1 for w in words if w in text)
-    if not scores or max(scores.values()) == 0:
-        return "正常"
-    return scores.most_common(1)[0][0]
-
-
-def compute_metrics(y_true, y_pred):
-    """计算准确率、宏 F1、各类别指标与混淆矩阵。"""
+def compute_metrics(y_true, y_pred, confidences=None, details=None):
+    """计算准确率、宏 F1、各类别指标、混淆矩阵与置信度统计。"""
     labels = sorted(set(y_true) | set(y_pred))
     n = len(y_true)
     accuracy = sum(1 for t, p in zip(y_true, y_pred) if t == p) / n if n else 0.0
@@ -90,11 +84,41 @@ def compute_metrics(y_true, y_pred):
         precision = tp / (tp + fp) if (tp + fp) else 0.0
         recall = tp / (tp + fn) if (tp + fn) else 0.0
         f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
-        per_class[label] = {"precision": precision, "recall": recall, "f1": f1, "n": sum(confusion[label].values())}
+        per_class[label] = {
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "n": sum(confusion[label].values()),
+        }
         f1s.append(f1)
     macro_f1 = sum(f1s) / len(f1s) if f1s else 0.0
-    return {"accuracy": accuracy, "macro_f1": macro_f1,
-            "per_class": per_class, "confusion": confusion, "labels": labels}
+
+    metrics = {
+        "accuracy": accuracy,
+        "macro_f1": macro_f1,
+        "per_class": per_class,
+        "confusion": confusion,
+        "labels": labels,
+    }
+
+    if confidences:
+        conf_by_true = defaultdict(list)
+        for true_label, confidence in zip(y_true, confidences):
+            conf_by_true[true_label].append(confidence)
+        for label, class_metrics in per_class.items():
+            values = conf_by_true.get(label) or [0.0]
+            class_metrics["avg_confidence"] = round(sum(values) / len(values), 4)
+        metrics["avg_confidence"] = round(sum(confidences) / len(confidences), 4)
+        metrics["min_confidence"] = round(min(confidences), 4)
+        metrics["max_confidence"] = round(max(confidences), 4)
+        metrics["low_confidence_count"] = sum(1 for c in confidences if c < 0.60)
+
+    if details:
+        metrics["errors"] = [
+            item for item in details if item["true"] != item["predicted"]
+        ]
+
+    return metrics
 
 
 def render_report(metrics, mode, sample_count):
@@ -102,18 +126,31 @@ def render_report(metrics, mode, sample_count):
     lines = []
     lines.append("# 情绪识别评测报告")
     lines.append("")
-    lines.append(f"- 评测模式：{'文本情绪（关键词基线）' if mode == 'text' else '语音情绪'}")
+    lines.append(f"- 评测模式：{'文本情绪（生产关键词基线）' if mode == 'text' else '语音情绪'}")
     lines.append(f"- 样本数量：{sample_count}")
+    lines.append("- 数据口径：内置人工标注小样本评测集，非真实用户脱敏数据")
     lines.append(f"- 准确率：**{metrics['accuracy']:.2%}**")
     lines.append(f"- 宏 F1：**{metrics['macro_f1']:.2%}**")
+    if "avg_confidence" in metrics:
+        lines.append(f"- 平均置信度：**{metrics['avg_confidence']:.2%}**")
+        lines.append(f"- 置信度范围：{metrics['min_confidence']:.2%} ~ {metrics['max_confidence']:.2%}")
+        lines.append(f"- 低置信度样本（<60%）：{metrics['low_confidence_count']} 条")
     lines.append("")
     lines.append("## 各类别指标")
     lines.append("")
-    lines.append("| 情绪 | 精确率 | 召回率 | F1 | 样本数 |")
-    lines.append("|------|--------|--------|-----|--------|")
+    header = "| 情绪 | 精确率 | 召回率 | F1 | 样本数 |"
+    separator = "|------|--------|--------|-----|--------|"
+    if "avg_confidence" in metrics:
+        header += " 平均置信度 |"
+        separator += "------------|"
+    lines.append(header)
+    lines.append(separator)
     for label in metrics["labels"]:
         c = metrics["per_class"][label]
-        lines.append(f"| {label} | {c['precision']:.2%} | {c['recall']:.2%} | {c['f1']:.2%} | {c['n']} |")
+        row = f"| {label} | {c['precision']:.2%} | {c['recall']:.2%} | {c['f1']:.2%} | {c['n']} |"
+        if "avg_confidence" in metrics:
+            row += f" {c['avg_confidence']:.2%} |"
+        lines.append(row)
     lines.append("")
     lines.append("## 混淆矩阵（行=真实，列=预测）")
     lines.append("")
@@ -124,16 +161,48 @@ def render_report(metrics, mode, sample_count):
         row = " | ".join(str(metrics["confusion"][t][p]) for p in labels)
         lines.append(f"| {t} | {row} |")
     lines.append("")
+
+    if "errors" in metrics:
+        lines.append("## 预测错误样本")
+        lines.append("")
+        if metrics["errors"]:
+            lines.append("| 真实 | 预测 | 置信度 | 文本 |")
+            lines.append("|------|------|--------|------|")
+            for item in metrics["errors"]:
+                text = item["text"].replace("|", "\\|")
+                lines.append(
+                    f"| {item['true']} | {item['predicted']} | "
+                    f"{item['confidence']:.2%} | {text} |"
+                )
+        else:
+            lines.append("无")
+        lines.append("")
+
     lines.append("> 说明：本报告由 `tools/benchmark_emotion.py` 自动生成。"
-                 "文本模式使用内置关键词分类器作为基线；语音模式使用实际情绪识别管线。")
+                 "文本模式复用 `core.text_emotion.classify_local_text_emotion`，"
+                 "与线上接口使用同一套分类规则；语音模式使用实际情绪识别管线。")
     lines.append("")
     return "\n".join(lines)
 
 
 def run_text_benchmark(samples):
     y_true = [label for label, _ in samples]
-    y_pred = [keyword_classify(text) for _, text in samples]
-    return compute_metrics(y_true, y_pred)
+    y_pred = []
+    confidences = []
+    details = []
+    for label, text in samples:
+        result = classify_local_text_emotion(text)
+        predicted = result.get("emotion", "正常")
+        confidence = result.get("confidence", 0.0)
+        y_pred.append(predicted)
+        confidences.append(confidence)
+        details.append({
+            "true": label,
+            "predicted": predicted,
+            "confidence": confidence,
+            "text": text,
+        })
+    return compute_metrics(y_true, y_pred, confidences, details)
 
 
 def run_audio_benchmark(manifest):

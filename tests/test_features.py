@@ -34,7 +34,13 @@ from core.database import (  # noqa: E402
     StudentRiskEvidence,
     Todo,
 )
-from core.digital_human import generate_reply  # noqa: E402
+from core.digital_human import (  # noqa: E402
+    _detect_crisis_level,
+    _effective_settings,
+    _engagement_hint,
+    generate_reply,
+    generate_reply_result,
+)
 
 
 class FeatureRegressionTest(unittest.TestCase):
@@ -59,14 +65,10 @@ class FeatureRegressionTest(unittest.TestCase):
         cls.zhangwei = {"Authorization": "Bearer " + zhangwei}
         cls.liuqiang = {"Authorization": "Bearer " + liuqiang}
 
-        with db.get_session() as session:
-            zhang = session.query(Student).filter(Student.counselor_id.isnot(None)).first()
-            cls.zhangwei_user_id = (
-                session.query(Student.counselor_id)
-                .filter(Student.id == zhang.id)
-                .scalar()
-                if zhang else None
-            )
+        profile = cls.client.get(
+            "/api/auth/profile", headers=cls.zhangwei
+        ).get_json()["data"]
+        cls.zhangwei_user_id = profile["user_id"]
 
     @staticmethod
     def _student_payload(suffix):
@@ -124,6 +126,34 @@ class FeatureRegressionTest(unittest.TestCase):
         self.assertTrue(crisis)
         self.assertTrue(content)
 
+    def test_digital_human_crisis_level_detects_variants(self):
+        self.assertEqual(_detect_crisis_level("我想死，活着没有意义")[0], 3)
+        self.assertEqual(_detect_crisis_level("我好累，不想坚持了")[0], 2)
+        self.assertEqual(_detect_crisis_level("活着没意思，反正也没人在乎我")[0], 2)
+        self.assertEqual(_detect_crisis_level("最近有点累")[0], 1)
+        self.assertEqual(_detect_crisis_level("今天天气不错")[0], 0)
+
+        result = generate_reply_result("我好累，不想坚持了")
+        self.assertEqual(result.crisis_level, 2)
+        self.assertTrue(result.crisis)
+        self.assertEqual(result.emotion, "concerned")
+
+    def test_digital_human_personalization_and_engagement_hint(self):
+        adjusted = _effective_settings(
+            {"style": "humor", "humor": 3},
+            {"risk_level": "critical", "emotion_status": "绝望"},
+        )
+        self.assertEqual(adjusted["style"], "pro")
+        self.assertEqual(adjusted["humor"], 1)
+
+        hint = _engagement_hint([
+            {"role": "assistant", "content": "先休息一下，好吗？"},
+            {"role": "user", "content": "我还是很累"},
+            {"role": "assistant", "content": "我们只做一小步。"},
+            {"role": "user", "content": "好"},
+        ])
+        self.assertIn("开放问题", hint)
+
     def test_digital_human_crisis_log_and_alert_are_linked(self):
         student_id = self._create_student()
         try:
@@ -161,6 +191,54 @@ class FeatureRegressionTest(unittest.TestCase):
             handled = db.mark_digital_human_log_handled(log_id, 1, "已电话确认")
             self.assertTrue(handled["handled"])
             self.assertEqual(handled["handled_by"], 1)
+        finally:
+            self._cleanup_student(student_id)
+
+    def test_digital_human_log_records_crisis_level_and_summary(self):
+        student_id = self._create_student()
+        try:
+            msg_id = db.create_message(
+                student_id=student_id,
+                counselor_id=1,
+                sender_type="student",
+                sender_id=student_id,
+                content="最近考试压力很大，晚上也睡不好",
+            )
+            log_id = db.create_digital_human_log(
+                counselor_id=1,
+                student_id=student_id,
+                message_id=msg_id,
+                content="我们先一起把任务拆小，今晚早点休息。",
+                crisis=True,
+                crisis_level=2,
+                triggered_keywords=["压力", "睡不好"],
+            )
+            logs = db.get_digital_human_logs(1, limit=10)
+            matching = [log for log in logs if log["id"] == log_id]
+            self.assertTrue(matching)
+            self.assertEqual(matching[0]["crisis_level"], 2)
+            self.assertEqual(matching[0]["triggered_keywords"], "压力,睡不好")
+
+            time.sleep(0.02)
+            db.create_message(
+                student_id=student_id,
+                counselor_id=1,
+                sender_type="student",
+                sender_id=student_id,
+                content="老师，那我今晚先试试早点睡",
+            )
+
+            summary = db.get_digital_human_summary(1)
+            student_summary = next(
+                (item for item in summary if item["student_id"] == student_id),
+                None,
+            )
+            self.assertIsNotNone(student_summary)
+            self.assertEqual(student_summary["rounds"], 1)
+            self.assertEqual(student_summary["high_risk_count"], 1)
+            self.assertTrue(student_summary["follow_up"])
+            self.assertEqual(student_summary["continued_after_ai"], 1)
+            self.assertEqual(student_summary["engagement_rate"], 100)
         finally:
             self._cleanup_student(student_id)
 
@@ -379,6 +457,34 @@ class FeatureRegressionTest(unittest.TestCase):
             ).get_json()["data"]
             sources = {item["source"] for item in timeline}
             self.assertIn("todo_done", sources)
+        finally:
+            self._cleanup_student(student_id)
+
+    def test_workplan_today_and_todo_student_relationship(self):
+        student_id = self._create_student(headers=self.zhangwei)
+        try:
+            todo_id = db.create_todo(
+                user_id=self.zhangwei_user_id,
+                title="带学生关系的待办回归",
+                category="student_care",
+                student_id=student_id,
+            )
+
+            resp = self.client.get(
+                "/api/workplan/today", headers=self.zhangwei
+            )
+            self.assertEqual(resp.status_code, 200)
+            self.assertGreater(
+                resp.get_json()["data"]["student_summary"]["total"], 0
+            )
+
+            workplan = db.get_today_workplan(counselor_id=self.zhangwei_user_id)
+            matching = [
+                item for item in workplan["todo_list"]
+                if item["id"] == f"todo_{todo_id}"
+            ]
+            self.assertTrue(matching)
+            self.assertEqual(matching[0]["student_db_id"], student_id)
         finally:
             self._cleanup_student(student_id)
 

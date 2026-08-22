@@ -7,7 +7,44 @@
 (function() {
   const { createApp, ref, reactive, computed, onMounted, nextTick, watch } = Vue;
 
-  createApp({
+  const app = createApp({
+    components: {
+      'dh-face': {
+        props: {
+          mood: { type: String, default: 'neutral' },
+          size: { type: String, default: 'sm' }
+        },
+        template: `
+          <div class="dh-face" :class="'dh-face--' + size + ' dh-mood--' + mood">
+            <svg viewBox="0 0 100 100" class="dh-face-svg" aria-hidden="true">
+              <rect x="2" y="2" width="96" height="96" rx="28" class="dh-face-base"></rect>
+              <circle cx="50" cy="43" r="27" class="dh-face-skin"></circle>
+              <g class="dh-brows">
+                <path v-if="mood === 'concerned' || mood === 'sad'" d="M28 30 Q36 24 44 30 M56 30 Q64 24 72 30" class="dh-feature-line"></path>
+                <path v-else d="M29 28 Q37 31 44 28 M56 28 Q63 31 71 28" class="dh-feature-line"></path>
+              </g>
+              <g class="dh-eyes">
+                <ellipse cx="37" cy="45" rx="5" ry="7" class="dh-eye"></ellipse>
+                <ellipse cx="63" cy="45" rx="5" ry="7" class="dh-eye"></ellipse>
+                <circle cx="39" cy="44" r="1.6" class="dh-eye-light"></circle>
+                <circle cx="65" cy="44" r="1.6" class="dh-eye-light"></circle>
+              </g>
+              <g class="dh-mouth">
+                <path v-if="mood === 'happy'" d="M34 56 Q50 70 66 56" class="dh-mouth-shape"></path>
+                <path v-else-if="mood === 'concerned' || mood === 'sad'" d="M36 62 Q50 52 64 62" class="dh-mouth-shape"></path>
+                <ellipse v-else-if="mood === 'speaking'" cx="50" cy="59" rx="10" ry="7" class="dh-mouth-shape dh-mouth-speaking"></ellipse>
+                <line v-else x1="42" y1="59" x2="58" y2="59" class="dh-mouth-line"></line>
+              </g>
+              <g class="dh-blush">
+                <ellipse v-if="mood === 'happy' || mood === 'speaking'" cx="29" cy="54" rx="5" ry="3" class="dh-blush-shape"></ellipse>
+                <ellipse v-if="mood === 'happy' || mood === 'speaking'" cx="71" cy="54" rx="5" ry="3" class="dh-blush-shape"></ellipse>
+              </g>
+            </svg>
+            <span v-if="mood === 'thinking'" class="dh-face-thinking"><i></i><i></i><i></i></span>
+          </div>
+        `
+      }
+    },
     setup() {
       // ==================== 认证状态 ====================
       const isLoggedIn = ref(!!localStorage.getItem('token'));
@@ -368,6 +405,9 @@
       const students = ref([]);
       const studentsLoading = ref(false);
       const studentSearch = ref('');
+      const studentPage = ref(1);
+      const studentPageSize = ref(20);
+      const studentTotal = ref(0);
       const showAddStudent = ref(false);
       const newStudent = reactive({ student_id: '', name: '', gender: '', college: '', class_name: '', phone: '', notes: '' });
       const selectedStudent = ref(null);
@@ -378,16 +418,48 @@
       const manualRiskLevel = ref('low');
       const manualRiskReason = ref('');
 
-      const searchStudentsDebounced = Helpers.debounce(async function() {
+      const studentTotalPages = computed(function() {
+        return Math.max(1, Math.ceil((studentTotal.value || 0) / (studentPageSize.value || 20)));
+      });
+
+      async function fetchStudents(pageNum) {
+        pageNum = Math.max(1, Number(pageNum) || 1);
         studentsLoading.value = true;
         try {
-          var d = await API.get('/student/list', { search: studentSearch.value, per_page: 100 });
+          var d = await API.get('/student/list', {
+            search: studentSearch.value,
+            page: pageNum,
+            per_page: studentPageSize.value
+          });
           students.value = d.data || [];
-        } catch (e) { console.warn('学生列表加载失败', e); }
-        finally { studentsLoading.value = false; }
-      }, 300);
+          studentTotal.value = Number(d.total || (d.data || []).length || 0);
+          studentPage.value = pageNum;
+        } catch (e) {
+          console.warn('学生列表加载失败', e);
+          Toast.error('学生列表加载失败');
+        } finally {
+          studentsLoading.value = false;
+        }
+      }
 
-      async function loadStudents() { searchStudentsDebounced(); }
+      const studentListSearch = Helpers.debounce(async function() {
+        studentPage.value = 1;
+        await fetchStudents(1);
+      }, 250);
+
+      async function loadStudents(resetPage) {
+        await fetchStudents(resetPage ? 1 : studentPage.value);
+      }
+
+      function prevStudentsPage() {
+        if (studentPage.value <= 1) return;
+        fetchStudents(studentPage.value - 1);
+      }
+
+      function nextStudentsPage() {
+        if (studentPage.value >= studentTotalPages.value) return;
+        fetchStudents(studentPage.value + 1);
+      }
 
       async function addStudent() {
         try {
@@ -549,7 +621,7 @@
       }
 
       // ==================== 情绪看板 ====================
-      const emoDashStats = reactive({ total: 0, highRisk: 0, mediumRisk: 0, avgIntensity: 0 });
+      const emoDashStats = reactive({ total: 0, studentCount: 0, highRisk: 0, mediumRisk: 0, avgIntensity: 0 });
       const emoDashAlerts = ref([]);
       const realtimeEmotionLogs = ref([]);
       const emoBoardLoading = ref(false);
@@ -562,6 +634,7 @@
           var s = await API.get('/emotion/statistics');
           if (s && s.data) {
             emoDashStats.total = s.data.total || 0;
+            emoDashStats.studentCount = s.data.student_count || 0;
             emoDashStats.highRisk = s.data.high_risk_count || 0;
             emoDashStats.mediumRisk = s.data.medium_risk_count || 0;
             emoDashStats.avgIntensity = s.data.avg_intensity || 0;
@@ -1151,9 +1224,11 @@
 
       const {
         dhSettings, dhLogs, dhPreviewMsgs, dhPreviewInput, dhPreviewLoading,
-        dhQuickQs, dhVoiceEnabled, contactPresence,
+        dhQuickQs, dhVoiceEnabled, dhAvatarMood, dhSpeakingMessageId,
+        dhPreviewSpeakingIndex, dhSummary, contactPresence,
         loadDigitalHuman, saveDigitalHuman, loadDigitalHumanLogs, markDigitalHumanLogHandled,
         askDigitalHuman, speakDigitalHuman, stopDigitalHumanSpeech,
+        crisisLevelLabel, crisisLevelClass, logFaceMood,
         loadContactPresence, startPresencePing, stopPresencePing
       } = dh;
 
@@ -1306,9 +1381,11 @@
         // 仪表盘
         dash, recentAlerts, loadDash, cPie, cTrend, cRisk, renderCharts,
         // 学生管理
-        students, studentsLoading, studentSearch, showAddStudent, newStudent, selectedStudent, studentProfiles,
+        students, studentsLoading, studentSearch, studentPage, studentPageSize, studentTotal, studentTotalPages,
+        showAddStudent, newStudent, selectedStudent, studentProfiles,
         studentRiskTimeline, studentRiskTimelineLoading, showStudentRiskTimeline, manualRiskLevel, manualRiskReason,
-        loadStudents, addStudent, viewStudent, updateStudentNotes, searchStudentsHandler,
+        loadStudents, studentListSearch, prevStudentsPage, nextStudentsPage,
+        addStudent, viewStudent, updateStudentNotes, searchStudentsHandler,
         loadStudentRiskTimeline, toggleStudentRiskTimeline, adjustStudentRisk,
         // 预警
         alerts, alertsLoading, alertStatusFilter, crisisOnly, alertStatusCounts, filteredAlerts,
@@ -1335,8 +1412,10 @@
         onNetworkSearchInput, locateNetworkStudent, networkZoom,
         // AI 数字人
         dhSettings, dhLogs, dhPreviewMsgs, dhPreviewInput, dhPreviewLoading, dhQuickQs, dhVoiceEnabled,
+        dhAvatarMood, dhSpeakingMessageId, dhPreviewSpeakingIndex, dhSummary,
         loadDigitalHuman, saveDigitalHuman, loadDigitalHumanLogs, markDigitalHumanLogHandled,
         askDigitalHuman, contactPresence, speakDigitalHuman, stopDigitalHumanSpeech,
+        crisisLevelLabel, crisisLevelClass, logFaceMood,
         // 通讯
         messageContacts, teacherSelected, teacherChatMsgs, teacherNewMsg, teacherUnreadCount, teacherMsgRef,
         studentSearchQuery, studentSearchResults, searchStudentsHandler, inviteStudent,
@@ -1378,5 +1457,6 @@
         exportData, reSeedData
       };
     }
-  }).mount('#app');
+  });
+  app.mount('#app');
 })();

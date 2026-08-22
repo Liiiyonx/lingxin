@@ -47,6 +47,29 @@
         @keyframes dhFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
         .dh-avatar .dh-ring{position:absolute;inset:-7px;border-radius:32px;border:2px dashed rgba(255,255,255,.45);animation:dhSpin 12s linear infinite}
         @keyframes dhSpin{to{transform:rotate(360deg)}}
+        .dh-face{position:relative;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+        .dh-face--hero{width:82px;height:82px}
+        .dh-face--sm{width:28px;height:28px}
+        .dh-face-svg{width:100%;height:100%;overflow:visible}
+        .dh-face-base{fill:#6366f1}
+        .dh-face-skin{fill:#f8fafc;opacity:.96}
+        .dh-feature-line{fill:none;stroke:#334155;stroke-width:4;stroke-linecap:round}
+        .dh-eye{fill:#334155}
+        .dh-eye-light{fill:#fff}
+        .dh-mouth-shape{fill:none;stroke:#334155;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+        .dh-mouth-line{stroke:#334155;stroke-width:4;stroke-linecap:round}
+        .dh-blush-shape{fill:#fb7185;opacity:.55}
+        .dh-mood--happy .dh-eyes{animation:dhBlink 4.2s ease-in-out infinite}
+        .dh-mood--speaking .dh-mouth-speaking{animation:dhTalk .18s ease-in-out infinite alternate;transform-origin:center}
+        .dh-mood--speaking .dh-eyes{animation:dhBlink 3.6s ease-in-out infinite}
+        .dh-mood--thinking .dh-eyes{animation:dhBlink 2.2s ease-in-out infinite}
+        .dh-mood--concerned .dh-brows,.dh-mood--sad .dh-brows{transform:translateY(1px)}
+        @keyframes dhBlink{0%,44%,100%{transform:scaleY(1)}48%,52%{transform:scaleY(.12)}}
+        @keyframes dhTalk{0%{transform:scaleY(.45)}100%{transform:scaleY(1)}}
+        .dh-face-thinking{position:absolute;right:-5px;top:-3px;display:inline-flex;gap:2px}
+        .dh-face-thinking i{width:5px;height:5px;border-radius:50%;background:#fff;display:inline-block;animation:typingBlink 1.1s infinite}
+        .dh-face-thinking i:nth-child(2){animation-delay:.15s}
+        .dh-face-thinking i:nth-child(3){animation-delay:.3s}
         .dh-status-dot{position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;border:3px solid #8b5cf6;background:#10b981}
         .dh-status-dot.off{background:#94a3b8}
         .dh-toggle{position:relative;width:46px;height:26px;border-radius:13px;border:none;cursor:pointer;background:rgba(255,255,255,.3);transition:background .2s;flex-shrink:0}
@@ -55,6 +78,9 @@
         .dh-toggle.on::after{left:23px}
         .dh-log-item{display:flex;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg-tertiary,#f1f5f9);margin-bottom:8px;font-size:13px}
         .dh-log-ai{width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+        .dh-summary-box{margin-bottom:12px;padding:10px 12px;border:1px solid #e0e7ff;border-left:4px solid #6366f1;border-radius:10px;background:#eef2ff;color:#3730a3}
+        .dh-summary-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;font-size:12px;line-height:1.7}
+        .dh-summary-item + .dh-summary-item{margin-top:8px;padding-top:8px;border-top:1px solid rgba(99,102,241,.18)}
         .dh-preview-bubble{max-width:85%;padding:10px 14px;border-radius:14px;border-top-left-radius:4px;background:var(--bg-secondary,#fff);border:1px solid var(--border-color,#e2e8f0);font-size:13px;line-height:1.7;box-shadow:0 2px 8px rgba(15,23,42,.06)}
         .ai-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px}
         .bubble.bubble-ai{background:linear-gradient(135deg,#eef2ff,#f5f3ff)!important;border:1px solid #c7d2fe!important}
@@ -96,6 +122,7 @@
             .network-footbar .ml-auto{width:100%;margin-left:0}
             .dh-hero{flex-direction:column;align-items:flex-start;gap:16px;padding:18px}
             .dh-avatar{width:72px;height:72px;border-radius:22px;font-size:40px}
+            .dh-face--hero{width:64px;height:64px}
             .dh-avatar .dh-ring{inset:-6px;border-radius:26px}
             .dh-hero .flex-1{width:100%}
             .dh-hero .flex.items-center.gap-3.mt-3{flex-wrap:wrap;gap:10px}
@@ -549,7 +576,7 @@
                                 <!-- 消息区 -->
                                 <div v-if="teacherSelected" class="flex-1 overflow-y-auto p-4 bg-tertiary" ref="teacherMsgRef">
                                     <div v-for="msg in teacherChatMsgs" :key="msg.id" class="flex items-start mb-3" :class="msg.sender_type==='counselor'?'justify-end':'justify-start'">
-                                        <div v-if="msg.sender_type==='assistant'" class="dh-log-ai" style="width:30px;height:30px;font-size:15px">🤖</div>
+                                        <div v-if="msg.sender_type==='assistant'" class="dh-log-ai" style="width:30px;height:30px;font-size:15px"><dh-face :mood="msg.id===dhSpeakingMessageId?'speaking':'neutral'" size="sm"></dh-face></div>
                                         <div class="bubble" :class="msg.sender_type==='counselor'?'bubble-sent':(msg.sender_type==='assistant'?'bubble-ai':'bubble-received')"><span v-if="msg.sender_type==='assistant'" class="ai-badge">🤖 AI分身</span> {{ msg.content }}<div class="bubble-time">{{ Helpers.formatTime(msg.created_at) }}</div></div>
                                     </div>
                                 </div>
@@ -570,7 +597,7 @@
                     <div class="page-header"><div><h3>AI 数字人</h3><p class="text-muted text-sm mt-1">老师离线时，数字分身以心理专家视角、幽默亲切地回答学生</p></div></div>
                     <!-- 数字人主卡片 -->
                     <div class="dh-hero mb-5">
-                        <div class="dh-avatar">🤖<span class="dh-ring"></span><span class="dh-status-dot" :class="{off:!dhSettings.enabled}"></span></div>
+                        <div class="dh-avatar"><dh-face :mood="dhAvatarMood" size="hero"></dh-face><span class="dh-ring"></span><span class="dh-status-dot" :class="{off:!dhSettings.enabled}"></span></div>
                         <div class="flex-1" style="position:relative;z-index:1">
                             <div class="flex items-center gap-3 mb-1"><h2 class="m-0 text-xl font-bold">{{ dhSettings.name || '小聆' }} <span class="text-sm font-normal opacity-80">· {{ currentUser.display_name || currentUser.username || '老师' }}老师的 AI 分身</span></h2></div>
                             <p class="m-0 text-sm opacity-90 leading-relaxed">{{ dhSettings.enabled ? '值班中：您离线期间，我会用幽默亲切的方式回复学生消息，并标注 AI 身份。' : '已休息：开启后，我将在您离线时代为回复学生。' }}</p>
@@ -600,9 +627,9 @@
                             <div class="overflow-y-auto mb-3" style="max-height:280px;min-height:180px">
                                 <div v-for="(m,i) in dhPreviewMsgs" :key="i" class="mb-3">
                                     <div v-if="m.role==='student'" class="flex justify-end mb-2"><div class="bubble bubble-sent" style="max-width:85%">{{ m.text }}</div></div>
-                                    <div v-else class="flex gap-2 items-start"><div class="dh-log-ai" style="width:28px;height:28px;font-size:14px">🤖</div><div class="dh-preview-bubble"><span class="ai-badge">🤖 AI分身</span> {{ m.text }}<button class="msg-speak-btn" @click.stop="speakDigitalHuman(m.text)" title="朗读这条回复">🔊</button></div></div>
+                                    <div v-else class="flex gap-2 items-start"><div class="dh-log-ai" style="width:28px;height:28px;font-size:14px"><dh-face :mood="m.speaking?'speaking':(m.mood||'neutral')" size="sm"></dh-face></div><div class="dh-preview-bubble"><span class="ai-badge">🤖 AI分身</span> {{ m.text }}<button class="msg-speak-btn" @click.stop="speakDigitalHuman(m.text, m.mood || 'neutral', null, i)" title="朗读这条回复">🔊</button></div></div>
                                 </div>
-                                <div v-if="dhPreviewLoading" class="flex gap-2 items-start"><div class="dh-log-ai ai-typing-avatar" style="width:28px;height:28px;font-size:14px">🤖</div><div class="dh-preview-bubble"><span class="typing-dots"><i></i><i></i><i></i></span></div></div>
+                                <div v-if="dhPreviewLoading" class="flex gap-2 items-start"><div class="dh-log-ai ai-typing-avatar" style="width:28px;height:28px;font-size:14px"><dh-face mood="thinking" size="sm"></dh-face></div><div class="dh-preview-bubble"><span class="typing-dots"><i></i><i></i><i></i></span></div></div>
                             </div>
                             <div class="flex gap-2 flex-wrap mb-3">
                                 <button v-for="q in dhQuickQs" :key="q" class="network-filter-chip" @click="askDigitalHuman(q)">{{ q }}</button>
@@ -612,12 +639,18 @@
                     </div>
                     <!-- 值班日志 -->
                     <div class="card mt-4"><div class="card-header"><span class="card-title">📋 分身值班日志</span><button class="btn btn-outline btn-xs" @click="loadDigitalHumanLogs">🔄 刷新</button></div>
+                        <div v-if="dhSummary.length" class="dh-summary-box">
+                            <div v-for="s in dhSummary" :key="s.student_id" class="dh-summary-item">
+                                <span>您离线期间，AI 分身与学生「<b>{{ s.student_name }}</b>」对话 {{ s.rounds }} 轮，主要关于 {{ s.topics.join('、') }}；其中 {{ s.high_risk_count }} 条为高风险/紧急，{{ s.attention_count }} 条需关注。AI 回复后继续倾诉 {{ s.continued_after_ai }}/{{ s.rounds }}（{{ s.engagement_rate }}%）。</span>
+                                <span v-if="s.follow_up" class="badge badge-danger" style="margin-left:8px">建议主动跟进</span>
+                            </div>
+                        </div>
                         <div v-if="dhLogs.length" class="overflow-y-auto" style="max-height:320px">
                             <div v-for="log in dhLogs" :key="log.id" class="dh-log-item">
-                                <div class="dh-log-ai">🤖</div>
+                                <div class="dh-log-ai"><dh-face :mood="logFaceMood(log)" size="sm"></dh-face></div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center justify-between gap-2 mb-1">
-                                        <div class="text-xs text-muted">回复 <b>{{ log.student_name }}</b> · {{ Helpers.formatTime(log.created_at) }}<span v-if="log.crisis" class="badge badge-danger" style="margin-left:6px">危机</span></div>
+                                        <div class="text-xs text-muted">回复 <b>{{ log.student_name }}</b> · {{ Helpers.formatTime(log.created_at) }}<span v-if="crisisLevelLabel(log.crisis_level)" :class="crisisLevelClass(log.crisis_level)" style="margin-left:6px">{{ crisisLevelLabel(log.crisis_level) }}</span></div>
                                         <button v-if="!log.handled" class="btn btn-xs btn-outline" @click="markDigitalHumanLogHandled(log)">标记已处理</button>
                                         <span v-else class="text-xs text-success font-semibold">✓ 已处理<span v-if="log.handled_at"> · {{ Helpers.formatDateTime(log.handled_at) }}</span></span>
                                     </div>
@@ -650,7 +683,7 @@
 
                 <!-- INCLUDE:partials/staff_core.html -->
                 <!-- INCLUDE:partials/student_pages.html -->
-        </div>
+        </main>
     </div>
 
     <!-- Toast -->

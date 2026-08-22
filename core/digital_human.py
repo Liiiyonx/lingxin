@@ -7,6 +7,7 @@
 
 import os
 import re
+import json
 import logging
 from datetime import datetime
 
@@ -26,6 +27,35 @@ CRISIS_RESPONSE_MARKERS = (
     "立即联系", "身边信任的人", "你现在安全吗",
 )
 
+CRISIS_LEVEL = {
+    0: "正常",
+    1: "关注",
+    2: "高风险",
+    3: "紧急",
+}
+
+URGENT_KEYWORDS = (
+    "想死", "不想活", "自杀", "自残", "结束生命", "活不下去",
+    "伤害自己", "割腕", "跳楼", "轻生", "去死", "自杀意念",
+    "结束自己", "自伤", "不想活了",
+    "suicide", "self-harm", "self harm", "kill myself", "end my life",
+    "want to die", "don't want to live", "cut myself",
+)
+
+RISK_SIGNAL_WORDS = (
+    "没有意义", "活着没意思", "没人在乎", "没人管", "撑不下去",
+    "熬不过去", "不想继续", "不想坚持", "坚持不下去", "解脱",
+    "想消失", "没有希望", "毫无希望", "看不到希望", "孤立无援",
+    "再也受不了", "撑不住", "活着像", "没有活下去",
+)
+
+NEGATIVE_EMOTION_WORDS = (
+    "难过", "伤心", "哭", "孤独", "失落", "委屈", "痛苦", "绝望",
+    "焦虑", "紧张", "担心", "害怕", "慌", "不安", "压力", "好累",
+    "低落", "压抑", "烦", "生气", "愤怒", "讨厌", "没意思", "累",
+    "无助", "无望", "没人理解", "不被理解",
+)
+
 
 def _clean_text(text):
     return re.sub(r"\s+", " ", (text or "").strip())
@@ -40,6 +70,160 @@ def _has_crisis_response_markers(content):
     return _has_keywords(_clean_text(content), CRISIS_RESPONSE_MARKERS)
 
 
+class ReplyResult:
+    """数字人回复结果。
+
+    支持旧的 ``content, crisis = generate_reply(...)`` 解包方式，同时给新调用方
+    提供 ``crisis_level``、``emotion`` 和 ``triggered_keywords`` 等结构化信息。
+    """
+
+    def __init__(self, content, crisis=False, crisis_level=0, emotion="neutral",
+                 triggered_keywords=None):
+        self.content = content
+        self.crisis = bool(crisis or crisis_level >= 2)
+        self.crisis_level = int(crisis_level or 0)
+        self.emotion = emotion or "neutral"
+        self.triggered_keywords = list(triggered_keywords or [])
+
+    def __iter__(self):
+        yield self.content
+        yield self.crisis
+
+    def __getitem__(self, index):
+        return (self.content, self.crisis)[index]
+
+    def get(self, key, default=None):
+        return self.to_dict().get(key, default)
+
+    def to_dict(self):
+        return {
+            "content": self.content,
+            "crisis": self.crisis,
+            "crisis_level": self.crisis_level,
+            "emotion": self.emotion,
+            "triggered_keywords": self.triggered_keywords,
+        }
+
+
+def _matched_keywords(text, words):
+    return [word for word in words if word in text]
+
+
+def _engagement_hint(history):
+    """根据历史 AI 回复是否被学生继续回应，给出本轮话术策略提示。"""
+    history = [item for item in (history or []) if isinstance(item, dict)]
+    assistant_indexes = [
+        index for index, item in enumerate(history)
+        if item.get("role") == "assistant"
+    ]
+    if not assistant_indexes:
+        return ""
+
+    continued = 0
+    for index in assistant_indexes:
+        next_item = history[index + 1] if index + 1 < len(history) else None
+        if (
+            next_item
+            and next_item.get("role") == "user"
+            and (next_item.get("content") or "").strip()
+        ):
+            continued += 1
+
+    ratio = continued / len(assistant_indexes)
+    if ratio >= 0.7:
+        return "历史对话显示该学生通常愿意继续回应，可在结尾留一个开放问题促进深入。"
+    if ratio < 0.4:
+        return "历史对话显示该学生回复后较少继续回应，本轮宜简短、降低压力，并给出一个可选择的小动作。"
+    return "历史对话显示该学生回应节奏一般，可给一个低压力的小问题或选择。"
+
+
+def _effective_settings(settings, student_context):
+    """按学生风险画像调整风格与幽默度，保证高危学生本地兜底也谨慎。"""
+    result = dict(settings or {})
+    context = student_context or {}
+    risk = str(context.get("risk_level") or "").strip().lower()
+    if risk in ("high", "critical"):
+        result["style"] = "pro"
+        result["humor"] = 1
+    elif risk == "medium":
+        result["humor"] = max(1, min(int(result.get("humor") or 3), 2))
+    return result
+
+
+def _llm_risk_probe(message, settings=None):
+    api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            timeout=4,
+        )
+        system_prompt = (
+            "你是高校心理健康危机分级器。只判断学生消息的心理危机等级，"
+            "不要输出建议。等级定义：0=正常，1=一般负面情绪，2=高风险语义，"
+            "3=明确自伤/自杀意图。严格返回 JSON："
+            '{"level":0,"reason":"简短原因"}'
+        )
+        resp = client.chat.completions.create(
+            model="qwen-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": _clean_text(message)},
+            ],
+            temperature=0,
+            max_tokens=60,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not match:
+            return None
+        data = json.loads(match.group())
+        level = int(data.get("level", 0))
+        return max(0, min(3, level))
+    except Exception as exc:
+        logger.info("危机语义兜底失败，回退到本地分级: %s", exc)
+        return None
+
+
+def _infer_emotion(message, crisis_level):
+    text = _clean_text(message)
+    if crisis_level >= 2:
+        return "concerned"
+    if _has_keywords(text, ("开心", "高兴", "太好了", "哈哈", "谢谢", "喜欢", "棒")):
+        return "happy"
+    if _has_keywords(text, NEGATIVE_EMOTION_WORDS):
+        return "sad"
+    return "neutral"
+
+
+def _detect_crisis_level(message, settings=None):
+    text = _clean_text(message)
+    urgent = _matched_keywords(text, URGENT_KEYWORDS)
+    if urgent:
+        return 3, urgent
+
+    risk = _matched_keywords(text, RISK_SIGNAL_WORDS)
+    if risk:
+        return 2, risk
+
+    probe_level = _llm_risk_probe(text, settings)
+    if probe_level == 3:
+        return 3, ["语义兜底-紧急"]
+    if probe_level == 2:
+        return 2, ["语义兜底-高风险"]
+
+    negative = _matched_keywords(text, NEGATIVE_EMOTION_WORDS)
+    if negative:
+        return 1, negative
+
+    if probe_level == 1:
+        return 1, ["语义兜底-关注"]
+    return 0, []
+
+
 def _crisis_reply(settings, student_name):
     name = (student_name or "同学").strip()
     return (
@@ -47,6 +231,18 @@ def _crisis_reply(settings, student_name):
         "如果此刻有伤害自己的冲动，请立即联系身边信任的人，或拨打 24 小时心理援助热线 "
         "12356 / 400-161-9995。我也会立刻提醒你的辅导员和心理中心。"
         "你愿意先告诉我，现在在哪里、身边有没有可以陪你的人吗？"
+    ), True
+
+
+def _risk_reply(settings, student_name):
+    name = (student_name or "同学").strip()
+    return (
+        f"{name}，我听见你现在的坚持已经耗掉很多力气了，谢谢你愿意说出来。"
+        "我们先不急着判断，先照顾好当下：如果可以，找一个安静安全的地方，"
+        "喝点温水，做几次深长呼吸。"
+        "如果你已经出现伤害自己的念头，请立刻联系身边信任的人，或拨打 24 小时心理援助热线 "
+        "12356 / 400-161-9995。我也会提醒你的辅导员尽快跟进，你不会被丢下。"
+        "你愿意先告诉我，现在最让你喘不过气的是什么吗？"
     ), True
 
 
@@ -137,7 +333,7 @@ def _local_reply(message, settings):
     return content, False
 
 
-def _openai_reply(message, settings):
+def _openai_reply(message, settings, history=None, student_context=None):
     """尝试使用 DashScope 生成更自然的回复，失败时抛出异常由调用方降级。"""
     api_key = os.environ.get("DASHSCOPE_API_KEY", "")
     if not api_key:
@@ -155,19 +351,41 @@ def _openai_reply(message, settings):
         "warm": "语气温暖亲切、有陪伴感，少说教，多共情。",
         "pro": "语气专业稳重，像有经验的心理专家，给出清晰、可执行的建议。",
     }[style]
+    context_notes = []
+    if student_context:
+        risk_level = str(student_context.get("risk_level") or "").strip()
+        emotion_status = str(student_context.get("emotion_status") or "").strip()
+        if risk_level or emotion_status:
+            context_notes.append(
+                f"该学生当前档案风险等级为「{risk_level or '未知'}」，"
+                f"情绪状态为「{emotion_status or '未知'}」。"
+                "风险越高，语气越要克制、谨慎、少幽默，优先稳定情绪并引导线下求助。"
+            )
+        engagement_hint = str(student_context.get("engagement_hint") or "").strip()
+        if engagement_hint:
+            context_notes.append(engagement_hint)
+    risk_note = " ".join(context_notes)
+
     system_prompt = (
         "你是高校心理辅导员的 AI 数字分身，在学生看不到老师在线时代为回复。"
         "你要以心理专家视角回应，尊重、不诊断、不贴标签、不承诺药物或治疗。"
         + style_guide
         + " 回复控制在 80 到 180 个中文字符，只输出给学生的回复正文。"
         "如果识别到自伤、自杀或严重危机，必须停止幽默，优先询问安全状态并提供 12356 / 400-161-9995 热线。"
+        + risk_note
     )
+    messages = [{"role": "system", "content": system_prompt}]
+    for item in (history or [])[-8:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = (item.get("content") or "").strip()
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": _clean_text(message)})
     resp = client.chat.completions.create(
         model="qwen-turbo",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": _clean_text(message)},
-        ],
+        messages=messages,
         temperature=0.75,
         max_tokens=320,
     )
@@ -177,8 +395,9 @@ def _openai_reply(message, settings):
     return content, _has_crisis_response_markers(content)
 
 
-def generate_reply(message, settings=None, student_name=""):
-    """生成数字人回复，返回 (content, crisis)。"""
+def generate_reply_result(message, settings=None, student_name="", history=None,
+                          student_context=None):
+    """生成数字人回复并返回结构化结果。"""
     settings = settings or {
         "enabled": True,
         "name": "小聆",
@@ -187,16 +406,56 @@ def generate_reply(message, settings=None, student_name=""):
         "delay": 2,
     }
     message = _clean_text(message)
+    student_context = dict(student_context or {})
+    history = [item for item in (history or []) if isinstance(item, dict)]
+    if not student_context.get("engagement_hint"):
+        student_context["engagement_hint"] = _engagement_hint(history)
+    settings = _effective_settings(settings, student_context)
     if not message:
-        return "我在呢，想聊什么都可以慢慢说 (｡･ω･｡)ﾉ", False
-    if _has_keywords(message, CRISIS_KEYWORDS):
-        return _crisis_reply(settings, student_name)
+        return ReplyResult(
+            "我在呢，想聊什么都可以慢慢说 (｡･ω･｡)ﾉ",
+            False, 0, "neutral", [],
+        )
+
+    level, keywords = _detect_crisis_level(message, settings)
+    if level >= 3:
+        content, _ = _crisis_reply(settings, student_name)
+        return ReplyResult(content, True, level, "concerned", keywords)
+    if level == 2:
+        content, _ = _risk_reply(settings, student_name)
+        return ReplyResult(content, True, level, "concerned", keywords)
 
     try:
-        return _openai_reply(message, settings)
+        content, has_markers = _openai_reply(
+            message, settings, history=history, student_context=student_context
+        )
+        if has_markers and level < 2:
+            level = 2
+            keywords = list(keywords) + ["回复中出现危机干预标记"]
+        return ReplyResult(
+            content,
+            level >= 2,
+            level,
+            _infer_emotion(message, level),
+            keywords,
+        )
     except Exception as exc:
         logger.warning("数字人大模型调用失败，使用本地回复: %s", exc)
-        return _local_reply(message, settings)
+        content, crisis = _local_reply(message, settings)
+        if crisis:
+            level = max(level, 2)
+        return ReplyResult(
+            content,
+            level >= 2,
+            level,
+            _infer_emotion(message, level),
+            keywords,
+        )
+
+
+def generate_reply(message, settings=None, student_name=""):
+    """兼容旧调用：仍可用 ``content, crisis = generate_reply(...)``。"""
+    return generate_reply_result(message, settings=settings, student_name=student_name)
 
 
 def digital_human_status(presence, settings):

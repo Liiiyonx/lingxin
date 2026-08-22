@@ -71,7 +71,7 @@
                 <!-- ══════ 学生管理 ══════ -->
                 <div v-if="page==='students'" class="fade-in">
                     <div class="card"><div class="flex justify-between items-center mb-4 flex-wrap gap-3"><span class="card-title m-0">👥 学生管理</span>
-                        <div class="flex gap-3 items-center"><input class="input input-sm" v-model="studentSearch" @input="searchStudentsHandler" placeholder="搜索学号/姓名..." style="width:200px"><button @click="showAddStudent=true" class="btn btn-primary btn-sm">+ 添加学生</button></div></div>
+                        <div class="flex gap-3 items-center"><input class="input input-sm" v-model="studentSearch" @input="studentListSearch" placeholder="搜索学号/姓名..." style="width:200px"><button @click="showAddStudent=true" class="btn btn-primary btn-sm">+ 添加学生</button></div></div>
                         <div class="table-container" v-if="studentsLoading">
                             <div class="skeleton skeleton-text" style="width:28%"></div>
                             <div class="skeleton skeleton-text" style="width:74%"></div>
@@ -83,8 +83,11 @@
                                 <tr v-if="!students.length"><td colspan="7" class="text-center text-muted p-8">暂无学生数据，点击「添加学生」开始</td></tr></tbody></table>
                         </div>
                         <!-- 分页 -->
-                        <div class="flex justify-center gap-2 mt-4" v-if="students.length>20">
-                            <button class="btn btn-outline btn-xs" disabled>上一页</button><span class="text-xs text-muted self-center px-2">共 {{ students.length }} 条</span><button class="btn btn-outline btn-xs" disabled>下一页</button></div>
+                        <div class="flex justify-center items-center gap-2 mt-4" v-if="studentTotal > studentPageSize">
+                            <button class="btn btn-outline btn-xs" :disabled="studentPage<=1" @click="prevStudentsPage">上一页</button>
+                            <span class="text-xs text-muted self-center px-2">第 {{ studentPage }} / {{ studentTotalPages }} 页 · 共 {{ studentTotal }} 条</span>
+                            <button class="btn btn-outline btn-xs" :disabled="studentPage>=studentTotalPages" @click="nextStudentsPage">下一页</button>
+                        </div>
                     </div>
                     <!-- 学生详情弹窗 -->
                     <div v-if="selectedStudent" class="dialog-mask" @click.self="selectedStudent=null"><div class="dialog-box" style="max-width:620px">
@@ -143,7 +146,7 @@
                 <div v-if="page==='emotionBoard'" class="fade-in">
                     <div class="page-header"><div><h3>情绪看板</h3><p class="text-muted text-sm mt-1">学生情绪健康全景监测</p></div><div class="flex gap-2"><button class="btn btn-success btn-sm" @click="seedRealtimeDemoData()">✨ 预置演示数据</button><button class="btn btn-outline btn-sm" @click="loadEmotionDashboard()">🔄 刷新数据</button></div></div>
                     <template v-if="!emoBoardLoading">
-                    <div class="stats-row"><div class="stat-card blue"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('students',20)"></div><div class="stat-label">监测学生总数</div><div class="stat-value">{{ emoDashStats.total||0 }}</div></div>
+                    <div class="stats-row"><div class="stat-card blue"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('students',20)"></div><div class="stat-label">监测学生总数</div><div class="stat-value">{{ emoDashStats.studentCount||0 }}</div><div class="stat-sub">情绪样本总数 {{ emoDashStats.total||0 }}</div></div>
                         <div class="stat-card red"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('alert',20)"></div><div class="stat-label">高风险预警</div><div class="stat-value">{{ emoDashStats.highRisk||0 }}</div></div>
                         <div class="stat-card orange"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('emotion',20)"></div><div class="stat-label">中风险关注</div><div class="stat-value">{{ emoDashStats.mediumRisk||0 }}</div></div>
                         <div class="stat-card green"><div class="stat-accent"></div><div class="stat-icon" v-html="Icons.render('chart',20)"></div><div class="stat-label">平均情绪强度</div><div class="stat-value">{{ emoDashStats.avgIntensity||0 }}</div></div></div>

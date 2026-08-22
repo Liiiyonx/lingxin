@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from sqlalchemy import (
     create_engine, Column, Integer, String, Text, Float, Boolean,
-    DateTime, ForeignKey, Enum as SAEnum, JSON, func
+    DateTime, ForeignKey, Enum as SAEnum, JSON, func, or_
 )
 from sqlalchemy.orm import (
     declarative_base, relationship, sessionmaker, scoped_session
@@ -362,6 +362,8 @@ class DigitalHumanLog(Base):
     message_id = Column(Integer, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True)
     content = Column(Text, nullable=False)
     crisis = Column(Boolean, default=False, nullable=False)
+    crisis_level = Column(Integer, default=0, nullable=False, comment="0正常/1关注/2高风险/3紧急")
+    triggered_keywords = Column(Text, nullable=True, comment="命中危机关键词或语义兜底标记")
     handled = Column(Boolean, default=False, nullable=False, comment="老师是否已处理")
     handled_at = Column(DateTime, nullable=True, comment="处理时间")
     handled_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="处理人用户ID")
@@ -421,6 +423,7 @@ class Todo(Base):
     created_at = Column(DateTime, default=datetime.now)
 
     user = relationship("User", foreign_keys=[user_id])
+    student = relationship("Student", foreign_keys=[student_id])
 
     def __repr__(self):
         return f"<Todo(id={self.id}, title={self.title})>"
@@ -540,6 +543,8 @@ class DatabaseManager:
                 "handled_at": "DATETIME",
                 "handled_by": "INTEGER",
                 "handled_note": "TEXT",
+                "crisis_level": "INTEGER DEFAULT 0 NOT NULL",
+                "triggered_keywords": "TEXT",
             },
             "alert_logs": {
                 "escalated": "BOOLEAN DEFAULT 0 NOT NULL",
@@ -851,8 +856,10 @@ class DatabaseManager:
             logs = q.all()
             if not logs:
                 return {"total": 0, "emotion_distribution": {}, "avg_intensity": 0,
+                        "student_count": 0,
                         "high_risk_count": 0, "medium_risk_count": 0, "low_risk_count": 0}
             total = len(logs)
+            student_count = len({log.student_id for log in logs if log.student_id})
             intensities = [l.intensity for l in logs if l.intensity]
             avg_intensity = round(sum(intensities) / len(intensities), 1) if intensities else 0
             emotion_counts = Counter(l.emotion for l in logs)
@@ -860,7 +867,7 @@ class DatabaseManager:
                           for emo, cnt in emotion_counts.most_common()}
             risk_counts = Counter(l.risk_level for l in logs)
             return {"total": total, "emotion_distribution": distribution,
-                    "avg_intensity": avg_intensity,
+                    "student_count": student_count, "avg_intensity": avg_intensity,
                     "high_risk_count": risk_counts.get("high", 0),
                     "medium_risk_count": risk_counts.get("medium", 0),
                     "low_risk_count": risk_counts.get("low", 0) + risk_counts.get("none", 0)}
@@ -1170,7 +1177,10 @@ class DatabaseManager:
                 q = q.filter(Student.counselor_id == counselor_id)
             if filters:
                 if filters.get("search"):
-                    q = q.filter(Student.name.contains(filters["search"]))
+                    q = q.filter(or_(
+                        Student.name.contains(filters["search"]),
+                        Student.student_id.contains(filters["search"]),
+                    ))
                 if filters.get("class_name"):
                     q = q.filter(Student.class_name == filters["class_name"])
                 if filters.get("risk_level"):
@@ -1810,7 +1820,8 @@ class DatabaseManager:
                 logs.append(item)
             return logs
 
-    def create_digital_human_log(self, counselor_id, student_id, message_id, content, crisis=False):
+    def create_digital_human_log(self, counselor_id, student_id, message_id, content,
+                                 crisis=False, crisis_level=0, triggered_keywords=None):
         """写入一条数字人自动回复日志。"""
         with self.get_session() as session:
             log = DigitalHumanLog(
@@ -1819,10 +1830,100 @@ class DatabaseManager:
                 message_id=message_id,
                 content=content,
                 crisis=bool(crisis),
+                crisis_level=max(0, min(3, int(crisis_level or 0))),
+                triggered_keywords=",".join(triggered_keywords) if triggered_keywords else None,
             )
             session.add(log)
             session.flush()
             return log.id
+
+    def get_digital_human_summary(self, counselor_id, limit=100):
+        """按学生聚合离线期间的数字人值班情况，用于老师上线后快速接管。"""
+        def infer_topic(text):
+            text = text or ""
+            rules = (
+                ("危机信号", ("自杀", "自残", "想死", "活不下去", "伤害自己", "割腕", "跳楼")),
+                ("学业压力", ("考试", "成绩", "挂科", "论文", "毕业", "复习", "学习")),
+                ("睡眠问题", ("失眠", "睡不好", "睡不着", "熬夜", "睡眠")),
+                ("人际困扰", ("室友", "同学", "朋友", "吵架", "矛盾", "恋爱", "分手", "孤立", "排挤")),
+                ("情绪低落", ("难过", "伤心", "孤独", "失落", "绝望", "压抑", "低落")),
+                ("焦虑紧张", ("焦虑", "紧张", "担心", "害怕", "慌", "不安")),
+            )
+            for topic, words in rules:
+                if any(word in text for word in words):
+                    return topic
+            return "日常沟通"
+
+        with self.get_session() as session:
+            rows = (
+                session.query(DigitalHumanLog, Student.name, Message.content)
+                .join(Student, Student.id == DigitalHumanLog.student_id)
+                .outerjoin(Message, Message.id == DigitalHumanLog.message_id)
+                .filter(DigitalHumanLog.counselor_id == counselor_id)
+                .order_by(DigitalHumanLog.created_at.desc(), DigitalHumanLog.id.desc())
+                .limit(limit)
+                .all()
+            )
+
+            grouped = {}
+            for log, student_name, student_content in rows:
+                key = log.student_id
+                level = int(log.crisis_level or (2 if log.crisis else 0))
+                if key not in grouped:
+                    grouped[key] = {
+                        "student_id": log.student_id,
+                        "student_name": student_name,
+                        "rounds": 0,
+                        "attention_count": 0,
+                        "high_risk_count": 0,
+                        "latest_message": "",
+                        "latest_at": None,
+                        "topics": [],
+                        "follow_up": False,
+                        "continued_after_ai": 0,
+                    }
+                item = grouped[key]
+                item["rounds"] += 1
+                if level >= 1:
+                    item["attention_count"] += 1
+                if level >= 2:
+                    item["high_risk_count"] += 1
+                if not item["latest_message"]:
+                    item["latest_message"] = (student_content or log.content or "").strip()
+                if item["latest_at"] is None or log.created_at > item["latest_at"]:
+                    item["latest_at"] = log.created_at
+                topic = infer_topic(student_content or log.content or "")
+                if topic not in item["topics"]:
+                    item["topics"].append(topic)
+                followed_up = (
+                    session.query(Message.id)
+                    .filter(
+                        Message.student_id == log.student_id,
+                        Message.counselor_id == log.counselor_id,
+                        Message.sender_type == "student",
+                        Message.created_at > log.created_at,
+                    )
+                    .first()
+                )
+                if followed_up:
+                    item["continued_after_ai"] += 1
+
+        summaries = []
+        for item in grouped.values():
+            item["latest_at"] = str(item["latest_at"]) if item["latest_at"] else None
+            item["follow_up"] = item["high_risk_count"] > 0 or item["attention_count"] >= 3
+            item["topics"] = item["topics"][:3]
+            item["engagement_rate"] = (
+                round(item["continued_after_ai"] * 100 / item["rounds"])
+                if item["rounds"]
+                else 0
+            )
+            item["silence_after_ai"] = max(
+                0, item["rounds"] - item["continued_after_ai"]
+            )
+            summaries.append(item)
+        summaries.sort(key=lambda x: x.get("latest_at") or "", reverse=True)
+        return summaries
 
     def mark_digital_human_log_handled(self, log_id, counselor_id, note=""):
         """老师上线后将数字人值班日志标记为已处理。"""
