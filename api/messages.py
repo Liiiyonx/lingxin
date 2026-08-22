@@ -1,4 +1,5 @@
 from core.digital_human import generate_reply_result, digital_human_status
+from core.agent import run_digital_human
 
 from api import common
 from api.common import *  # noqa: F401,F403
@@ -158,12 +159,13 @@ def send_message():
                         if delay:
                             time.sleep(delay)
                         history = _build_message_history(student_id, counselor_id, msg_id)
-                        result = generate_reply_result(
+                        result = run_digital_human(
                             content,
-                            settings,
                             student_name,
+                            settings,
                             history=history,
                             student_context=student_context,
+                            create_alert=False,
                         )
                         reply = result.content
                         crisis = result.crisis

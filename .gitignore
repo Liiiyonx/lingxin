@@ -20,7 +20,9 @@ __pycache__/
 
 # 输出与渲染产物
 outputs/
+output/
 .qa_render/
+tmp/
 
 # 音频样本
 audio_samples/*.wav
