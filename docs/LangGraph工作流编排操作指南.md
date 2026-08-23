@@ -225,7 +225,7 @@ reply, crisis = result["reply"], result["crisis"]
 ```bash
 python -m unittest discover -s tests -q
 ```
-期望：70 项全部通过。
+期望：74 项全部通过。
 
 2. **新增 LangGraph 单测**（`tests/test_agent.py`）：
    - 数字人 Agent：输入"我想死"→ 断言 `crisis=True` 且生成了高危预警；
@@ -241,7 +241,7 @@ python -m unittest discover -s tests -q
 | 风险 | 概率 | 缓解 |
 |---|---|---|
 | langchain/langgraph 依赖冲突 | 低 | 用独立 venv 测试；冲突则固定版本号 |
-| 工作流引入 bug | 低 | 只影响数字人/预警两处，70 测试兜底 |
+| 工作流引入 bug | 低 | 只影响数字人/预警两处，74 测试兜底 |
 | 需要回退 | — | LangGraph 是增量层，删掉 `core/agent/` + 还原 `messages.py` 那一行即可，一键回退 |
 
 ---
