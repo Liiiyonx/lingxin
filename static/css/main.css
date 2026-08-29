@@ -504,7 +504,6 @@ textarea.input{resize:vertical;min-height:80px}
     .chat-layout{height:calc(100vh - 124px);min-height:480px;flex-direction:column}
     .chat-sidebar{width:100%;max-height:35vh;min-height:150px;border-right:0;border-bottom:1px solid var(--border-color)}
     .chat-main{flex:1;min-height:0}
-    .chat-main .flex-1.overflow-y-auto{min-height:0}
     .bubble{max-width:86%;font-size:14px}
     .chat-compose-row{gap:6px}
     .chat-emoji-btn{width:34px;height:38px}
