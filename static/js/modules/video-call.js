@@ -24,11 +24,14 @@
       const teacherLocalVideo = ref(null), teacherRemoteVideo = ref(null);
       const teacherInCall = ref(false), teacherVideoEnabled = ref(true), teacherAudioEnabled = ref(true);
       const incomingCall = ref(null);
-      let localStream = null, peerConnection = null;
-      let teacherLocalStream = null, teacherPeerConn = null;
-      let pendingStudentCandidates = [], pendingTeacherCandidates = [];
+      let agoraClient = null, localVideoTrack = null, localAudioTrack = null;
+      let agoraTeacherClient = null, teacherVideoTrack = null, teacherAudioTrack = null;
+      let agoraConfig = null;
+      let remoteMediaStream = null;
       const callRoom = ref('');
       const videoRoom = ref('teacher_room');
+      // 控制台临时 Token 绑定固定频道，因此呼叫通道不能再用时间戳动态生成
+      const AGORA_CHANNEL = 'video_check';
       var studentVideoListenersSet = false, teacherVideoListenersSet = false;
       const visionDiag = reactive({
         modelReady: false,
@@ -119,20 +122,80 @@
         audioDiag.updatedAt = '--';
       }
 
-      function attachRemoteStream(videoEl, stream) {
-        if (!videoEl || !stream) return;
-        videoEl.srcObject = stream;
-        videoEl.autoplay = true;
-        videoEl.playsInline = true;
-        refreshAudioDiag('remote', stream);
-        var playPromise = videoEl.play ? videoEl.play() : null;
-        if (playPromise && playPromise.catch) {
-          playPromise.then(function() { audioDiag.playBlocked = false; }).catch(function() {
-            audioDiag.playBlocked = true;
+      function combineTrackStreams(trackList) {
+        var tracks = [];
+        (trackList || []).forEach(function(track) {
+          if (!track) return;
+          var stream = track.getMediaStream ? track.getMediaStream() : null;
+          var mediaTracks = (stream && stream.getTracks) ? stream.getTracks() : [];
+          if (!mediaTracks.length && track.getMediaStreamTrack) {
+            var direct = track.getMediaStreamTrack();
+            if (direct) mediaTracks.push(direct);
+          }
+          mediaTracks.forEach(function(t) {
+            if (!tracks.some(function(e) { return e.id === t.id; })) tracks.push(t);
           });
-        }
+        });
+        return new MediaStream(tracks);
       }
 
+      function getRemoteMediaStream(user) {
+        if (!remoteMediaStream) remoteMediaStream = new MediaStream();
+        [user.videoTrack, user.audioTrack].forEach(function(track) {
+          if (!track || !track.getMediaStreamTrack) return;
+          var t = track.getMediaStreamTrack();
+          if (t && !remoteMediaStream.getTracks().some(function(e) { return e.id === t.id; })) {
+            remoteMediaStream.addTrack(t);
+          }
+        });
+        return remoteMediaStream;
+      }
+
+      function getLocalMediaStream() {
+        return combineTrackStreams([localVideoTrack, localAudioTrack]);
+      }
+
+      function getAgoraUid(role) {
+        if (role === 'teacher') {
+          return 'teacher_' + (currentUser.user_id || currentUser.id || 'counselor');
+        }
+        return String(currentUser.student_id || currentUser.user_id || currentUser.id || 'student');
+      }
+
+      async function ensureAgoraReady() {
+        if (!window.AgoraRTC && window._loadAgoraRTC) {
+          await new Promise(function(resolve) { window._loadAgoraRTC(resolve); });
+        }
+        if (!window.AgoraRTC) {
+          Toast.error('\u58f0\u7f51 SDK \u672a\u52a0\u8f7d');
+          return null;
+        }
+        if (!agoraConfig) {
+          try {
+            var info = await fetch('/system/info');
+            var data = await info.json();
+            var cfg = (data && data.video && data.video.agora) || {};
+            agoraConfig = { appId: cfg.app_id || cfg.appId || '' };
+          } catch (e) {
+            agoraConfig = null;
+          }
+        }
+        if (!agoraConfig || !agoraConfig.appId) {
+          Toast.error('\u58f0\u7f51 App ID \u672a\u914d\u7f6e');
+          return null;
+        }
+        return agoraConfig;
+      }
+
+      async function fetchAgoraToken(channel, uid) {
+        try {
+          var resp = await fetch('/api/video/agora-token?channel=' + encodeURIComponent(channel) + '&uid=' + encodeURIComponent(uid));
+          var data = await resp.json();
+          return data && data.token ? data.token : null;
+        } catch (e) {
+          return null;
+        }
+      }
 
       // ===== 学生端 WebRTC =====
       function initStudentVideo() {
@@ -141,71 +204,13 @@
           if (data.caller !== 'student') return;
           callRoom.value = data.room;
           socket.emit('join', { room: data.room });
-          createPeerConn(); createOffer();
         });
         socket.on('incoming_video_call', function(data) {
           if (data.caller !== 'teacher' || String(data.student_id || '') !== String(currentUser.student_id || '')) return;
           incomingStudentCall.value = data;
           Toast.info((data.teacher_name || '\u8001\u5e08') + ' \u9080\u8bf7\u4f60\u89c6\u9891\u901a\u8bdd');
         });
-        socket.on('video_offer', function(data) {
-          if (data.sender !== 'teacher') return;
-          if (!peerConnection) createPeerConn();
-          if (peerConnection.signalingState === 'stable') {
-            peerConnection.setRemoteDescription(new RTCSessionDescription(data)).then(function() { flushStudentCandidates(); createAnswer(); }).catch(function(e) { console.log(e); });
-          }
-        });
-        socket.on('video_answer', function(data) {
-          if (data.sender !== 'teacher') return;
-          if (peerConnection && peerConnection.signalingState === 'have-local-offer') {
-            peerConnection.setRemoteDescription(new RTCSessionDescription(data)).then(function() { flushStudentCandidates(); }).catch(function(e) { console.log(e); });
-          }
-        });
-        socket.on('video_ice_candidate', function(data) {
-          if (data.sender !== 'teacher' || !data.candidate || !data.candidate.candidate) return;
-          if (peerConnection && peerConnection.remoteDescription) peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(function(e) {});
-          else pendingStudentCandidates.push(data.candidate);
-        });
         socket.on('video_call_ended', function(data) { if (!data || data.sender !== 'student') endVideoCall(true); });
-      }
-
-      function flushStudentCandidates() {
-        if (!peerConnection || !peerConnection.remoteDescription) return;
-        pendingStudentCandidates.splice(0).forEach(function(c) {
-          peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(function(e) {});
-        });
-      }
-
-      function createPeerConn() {
-        if (peerConnection) { peerConnection.close(); peerConnection = null; }
-        peerConnection = new RTCPeerConnection({ iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' }
-        ], iceCandidatePoolSize: 2 });
-        if (localStream) localStream.getTracks().forEach(function(t) { peerConnection.addTrack(t, localStream); });
-        peerConnection.onicecandidate = function(e) {
-          if (e.candidate && e.candidate.candidate) socket.emit('video_ice_candidate', { candidate: e.candidate, room: callRoom.value, sender: 'student' });
-        };
-        peerConnection.ontrack = function(e) {
-          if (remoteVideo.value && e.streams[0]) {
-            attachRemoteStream(remoteVideo.value, e.streams[0]);
-          }
-        };
-      }
-
-      async function createOffer() {
-        if (!peerConnection || peerConnection.signalingState !== 'stable') return;
-        var offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        socket.emit('video_offer', { type: offer.type, sdp: offer.sdp, room: callRoom.value, sender: 'student' });
-      }
-
-      async function createAnswer() {
-        if (!peerConnection || peerConnection.signalingState !== 'have-remote-offer') return;
-        var answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        socket.emit('video_answer', { type: answer.type, sdp: answer.sdp, room: callRoom.value, sender: 'student' });
       }
 
       function getMediaUnsupportedMessage() {
@@ -219,50 +224,93 @@
         return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
       }
 
+      function agoraJoinErrorMessage(err) {
+        var msg = String((err && (err.message || err)) || '');
+        if (msg.indexOf('dynamic use static key') !== -1 || msg.indexOf('CAN_NOT_GET_GATEWAY_SERVER') !== -1) {
+          return '\u58f0\u7f51\u9274\u6743\u672a\u914d\u7f6e\uff1a\u8bf7\u5230\u58f0\u7f51\u63a7\u5236\u53f0\u5173\u95ed\u8be5\u9879\u76ee\u7684 App \u8bc1\u4e66\u9274\u6743\uff1b\u6216\u628a App \u8bc1\u4e66/\u4e34\u65f6 Token \u586b\u5165 .env \u7684 AGORA_APP_CERT/AGORA_TOKEN \u540e\u91cd\u542f\u670d\u52a1';
+        }
+        return '\u65e0\u6cd5\u8bbf\u95ee\u6444\u50cf\u5934\uff1a' + msg;
+      }
+
       async function startVideoCall(options) {
         options = options || {};
         if (!isMediaSupported()) {
           Toast.error(getMediaUnsupportedMessage()); return false;
         }
+        var cfg = await ensureAgoraReady();
+        if (!cfg) return false;
         try {
+          remoteMediaStream = null;
           var perms = await navigator.permissions.query({ name: 'camera' }).catch(function() { return null; });
           if (perms && perms.state === 'denied') { Toast.error('\u6444\u50cf\u5934\u6743\u9650\u5df2\u88ab\u62d2\u7edd\uff0c\u8bf7\u5728\u6d4f\u89c8\u5668\u8bbe\u7f6e\u4e2d\u5141\u8bb8'); return false; }
-          localStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 720 }, height: { ideal: 960 }, facingMode: 'user' }, audio: true });
-          refreshAudioDiag('local', localStream);
+          callRoom.value = options.reuseRoom || AGORA_CHANNEL;
+          var studentUid = getAgoraUid('student');
+          var token = await fetchAgoraToken(callRoom.value, studentUid);
+          var created = await Promise.all([AgoraRTC.createCameraVideoTrack(), AgoraRTC.createMicrophoneAudioTrack()]);
+          var videoTrack = created[0], audioTrack = created[1];
+          var client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+          client.on('user-published', async function(user, mediaType) {
+            await client.subscribe(user, mediaType);
+            if (mediaType === 'video') {
+              if (user.videoTrack && user.videoTrack.play) user.videoTrack.play(remoteVideo.value);
+              refreshAudioDiag('remote', getRemoteMediaStream(user));
+            } else if (mediaType === 'audio') {
+              if (user.audioTrack && user.audioTrack.play) user.audioTrack.play();
+              refreshAudioDiag('remote', getRemoteMediaStream(user));
+            }
+          });
+          client.on('user-left', function() { if (isInCall.value) endVideoCall(true); });
+          agoraClient = client; localVideoTrack = videoTrack; localAudioTrack = audioTrack;
+          await client.join(cfg.appId, callRoom.value, token, studentUid);
+          await client.publish([videoTrack, audioTrack]);
+          refreshAudioDiag('local', getLocalMediaStream());
           isInCall.value = true; isVideoEnabled.value = true; isAudioEnabled.value = true;
           await nextTick();
-          if (localVideo.value) localVideo.value.srcObject = localStream;
+          if (localVideo.value && localVideoTrack.play) localVideoTrack.play(localVideo.value);
           if (!socket) { Toast.error('\u8fde\u63a5\u672a\u5c31\u7eea\uff0c\u8bf7\u5237\u65b0\u9875\u9762'); endVideoCall(true); return false; }
           initStudentVideo();
-          callRoom.value = options.reuseRoom || ('video_' + Date.now());
           socket.emit('join', { room: callRoom.value });
-          if (!options.skipRequest) socket.emit('video_call_request', { caller: 'student', student_id: currentUser.student_id, student_name: currentUser.name, room: callRoom.value });
+          if (!options.skipRequest) socket.emit('video_call_request', { caller: 'student', student_id: currentUser.student_id, student_name: currentUser.name, room: callRoom.value, counselor_id: (selectedContact.value && selectedContact.value.id) || null });
           return true;
         } catch (err) {
+          if (agoraClient) { agoraClient.leave().catch(function() {}); agoraClient = null; }
+          if (localVideoTrack) { localVideoTrack.close(); localVideoTrack = null; }
+          if (localAudioTrack) { localAudioTrack.close(); localAudioTrack = null; }
+          if (localVideo.value) localVideo.value.srcObject = null;
+          remoteMediaStream = null;
+          isInCall.value = false;
           if (err.name === 'NotAllowedError') Toast.error('\u6444\u50cf\u5934\u6216\u9ea6\u514b\u98ce\u6743\u9650\u88ab\u62d2\u7edd');
           else if (err.name === 'NotFoundError') Toast.error('\u672a\u68c0\u6d4b\u5230\u6444\u50cf\u5934\u6216\u9ea6\u514b\u98ce\u8bbe\u5907');
-          else Toast.error('\u65e0\u6cd5\u8bbf\u95ee\u6444\u50cf\u5934\uff1a' + err.message);
+          else Toast.error(agoraJoinErrorMessage(err));
           return false;
         }
       }
 
       function endVideoCall(silent) {
         stopAllRealtime();
-        if (localStream) { localStream.getTracks().forEach(function(t) { t.stop(); }); localStream = null; }
-        if (peerConnection) { peerConnection.close(); peerConnection = null; }
-        pendingStudentCandidates = [];
+        if (agoraClient) { agoraClient.leave().catch(function() {}); agoraClient = null; }
+        if (localVideoTrack) { localVideoTrack.close(); localVideoTrack = null; }
+        if (localAudioTrack) { localAudioTrack.close(); localAudioTrack = null; }
         if (localVideo.value) localVideo.value.srcObject = null;
         if (remoteVideo.value) remoteVideo.value.srcObject = null;
+        remoteMediaStream = null;
         resetAudioDiag();
         isInCall.value = false;
         if (!silent && socket) socket.emit('video_call_end', { room: callRoom.value, sender: 'student' });
       }
 
       function toggleVideo() {
-        if (localStream) { var t = localStream.getVideoTracks()[0]; if (t) { t.enabled = !t.enabled; isVideoEnabled.value = t.enabled; } }
+        if (!localVideoTrack) return;
+        var next = !isVideoEnabled.value;
+        localVideoTrack.setEnabled(next);
+        isVideoEnabled.value = next;
       }
       function toggleAudio() {
-        if (localStream) { var t = localStream.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; isAudioEnabled.value = t.enabled; refreshAudioDiag('local', localStream); } }
+        if (!localAudioTrack) return;
+        var next = !isAudioEnabled.value;
+        localAudioTrack.setEnabled(next);
+        isAudioEnabled.value = next;
+        refreshAudioDiag('local', getLocalMediaStream());
       }
 
       async function ensureStudentCallContact(callData) {
@@ -288,7 +336,7 @@
       async function acceptStudentCall() {
         if (!incomingStudentCall.value) return;
         await ensureStudentCallContact(incomingStudentCall.value);
-        callRoom.value = incomingStudentCall.value.room || ('video_' + Date.now());
+        callRoom.value = incomingStudentCall.value.room || AGORA_CHANNEL;
         var started = await startVideoCall({ reuseRoom: callRoom.value, skipRequest: true });
         if (!started) return;
         socket.emit('join', { room: callRoom.value });
@@ -312,34 +360,8 @@
           if (data.caller !== 'teacher') return;
           videoRoom.value = data.room;
           socket.emit('join', { room: videoRoom.value });
-          createTeacherPeerConn(); createTeacherOffer();
-        });
-        socket.on('video_offer', function(data) {
-          if (data.sender !== 'student') return;
-          if (!teacherPeerConn) createTeacherPeerConn();
-          if (teacherPeerConn.signalingState === 'stable') {
-            teacherPeerConn.setRemoteDescription(new RTCSessionDescription(data)).then(function() { flushTeacherCandidates(); createTeacherAnswer(); }).catch(function(e) { console.log(e); });
-          }
-        });
-        socket.on('video_answer', function(data) {
-          if (data.sender !== 'student') return;
-          if (teacherPeerConn && teacherPeerConn.signalingState === 'have-local-offer') {
-            teacherPeerConn.setRemoteDescription(new RTCSessionDescription(data)).then(function() { flushTeacherCandidates(); }).catch(function(e) { console.log(e); });
-          }
-        });
-        socket.on('video_ice_candidate', function(data) {
-          if (data.sender !== 'student' || !data.candidate || !data.candidate.candidate) return;
-          if (teacherPeerConn && teacherPeerConn.remoteDescription) teacherPeerConn.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(function(e) {});
-          else pendingTeacherCandidates.push(data.candidate);
         });
         socket.on('video_call_ended', function(data) { if (!data || data.sender !== 'teacher') endTeacherVideo(true); });
-      }
-
-      function flushTeacherCandidates() {
-        if (!teacherPeerConn || !teacherPeerConn.remoteDescription) return;
-        pendingTeacherCandidates.splice(0).forEach(function(c) {
-          teacherPeerConn.addIceCandidate(new RTCIceCandidate(c)).catch(function(e) {});
-        });
       }
 
       async function startTeacherVideo(options) {
@@ -347,59 +369,57 @@
         if (!isMediaSupported()) {
           Toast.error(getMediaUnsupportedMessage()); return false;
         }
+        var cfg = await ensureAgoraReady();
+        if (!cfg) return false;
         try {
-          teacherLocalStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: true });
-          refreshAudioDiag('local', teacherLocalStream);
+          remoteMediaStream = null;
+          videoRoom.value = options.reuseRoom || AGORA_CHANNEL;
+          var teacherUid = getAgoraUid('teacher');
+          var token = await fetchAgoraToken(videoRoom.value, teacherUid);
+          var created = await Promise.all([AgoraRTC.createCameraVideoTrack(), AgoraRTC.createMicrophoneAudioTrack()]);
+          var videoTrack = created[0], audioTrack = created[1];
+          var client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+          client.on('user-published', async function(user, mediaType) {
+            await client.subscribe(user, mediaType);
+            if (mediaType === 'video') {
+              var remoteStream = getRemoteMediaStream(user);
+              if (user.videoTrack && user.videoTrack.play) user.videoTrack.play(teacherRemoteVideo.value);
+              refreshAudioDiag('remote', remoteStream);
+              autoStartRealtimeEmotion(remoteStream, teacherRemoteVideo.value);
+            } else if (mediaType === 'audio') {
+              if (user.audioTrack && user.audioTrack.play) user.audioTrack.play();
+              var stream = getRemoteMediaStream(user);
+              refreshAudioDiag('remote', stream);
+              if (yoloActive.value) startRealtimeEmotion(stream);
+            }
+          });
+          client.on('user-left', function() { if (teacherInCall.value) endTeacherVideo(true); });
+          agoraTeacherClient = client; teacherVideoTrack = videoTrack; teacherAudioTrack = audioTrack;
+          await client.join(cfg.appId, videoRoom.value, token, teacherUid);
+          await client.publish([videoTrack, audioTrack]);
+          refreshAudioDiag('local', combineTrackStreams([teacherVideoTrack, teacherAudioTrack]));
           teacherInCall.value = true; teacherVideoEnabled.value = true; teacherAudioEnabled.value = true;
-          videoRoom.value = options.reuseRoom || ('video_' + Date.now());
           await nextTick();
-          if (teacherLocalVideo.value) teacherLocalVideo.value.srcObject = teacherLocalStream;
+          if (teacherLocalVideo.value && teacherVideoTrack.play) teacherVideoTrack.play(teacherLocalVideo.value);
           if (socket) { socket.emit('join', { room: videoRoom.value }); }
           return true;
         } catch (err) {
+          if (agoraTeacherClient) { agoraTeacherClient.leave().catch(function() {}); agoraTeacherClient = null; }
+          if (teacherVideoTrack) { teacherVideoTrack.close(); teacherVideoTrack = null; }
+          if (teacherAudioTrack) { teacherAudioTrack.close(); teacherAudioTrack = null; }
+          if (teacherLocalVideo.value) teacherLocalVideo.value.srcObject = null;
+          remoteMediaStream = null;
+          teacherInCall.value = false;
           if (err.name === 'NotAllowedError') Toast.error('\u6444\u50cf\u5934\u6216\u9ea6\u514b\u98ce\u6743\u9650\u88ab\u62d2\u7edd');
           else if (err.name === 'NotFoundError') Toast.error('\u672a\u68c0\u6d4b\u5230\u6444\u50cf\u5934\u6216\u9ea6\u514b\u98ce\u8bbe\u5907');
-          else Toast.error('\u65e0\u6cd5\u8bbf\u95ee\u6444\u50cf\u5934\uff1a' + err.message);
+          else Toast.error(agoraJoinErrorMessage(err));
           return false;
         }
       }
 
-      function createTeacherPeerConn() {
-        if (teacherPeerConn) { teacherPeerConn.close(); teacherPeerConn = null; }
-        teacherPeerConn = new RTCPeerConnection({ iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' }
-        ], iceCandidatePoolSize: 2 });
-        if (teacherLocalStream) teacherLocalStream.getTracks().forEach(function(t) { teacherPeerConn.addTrack(t, teacherLocalStream); });
-        teacherPeerConn.onicecandidate = function(e) {
-          if (e.candidate && e.candidate.candidate) socket.emit('video_ice_candidate', { candidate: e.candidate, room: videoRoom.value, sender: 'teacher' });
-        };
-        teacherPeerConn.ontrack = function(e) {
-          if (teacherRemoteVideo.value && e.streams[0]) {
-            attachRemoteStream(teacherRemoteVideo.value, e.streams[0]);
-            autoStartRealtimeEmotion(e.streams[0], teacherRemoteVideo.value);
-          }
-        };
-      }
-
-      async function createTeacherOffer() {
-        if (!teacherPeerConn || teacherPeerConn.signalingState !== 'stable') return;
-        var offer = await teacherPeerConn.createOffer();
-        await teacherPeerConn.setLocalDescription(offer);
-        socket.emit('video_offer', { type: offer.type, sdp: offer.sdp, room: videoRoom.value, sender: 'teacher' });
-      }
-
-      async function createTeacherAnswer() {
-        if (!teacherPeerConn || teacherPeerConn.signalingState !== 'have-remote-offer') return;
-        var answer = await teacherPeerConn.createAnswer();
-        await teacherPeerConn.setLocalDescription(answer);
-        socket.emit('video_answer', { type: answer.type, sdp: answer.sdp, room: videoRoom.value, sender: 'teacher' });
-      }
-
       async function acceptVideoCall() {
         if (incomingCall.value) await ensureTeacherCallContact(incomingCall.value);
-        if (incomingCall.value) videoRoom.value = incomingCall.value.room || ('video_' + Date.now());
+        if (incomingCall.value) videoRoom.value = incomingCall.value.room || AGORA_CHANNEL;
         if (!teacherInCall.value) {
           var started = await startTeacherVideo({ reuseRoom: videoRoom.value });
           if (!started) return;
@@ -416,21 +436,29 @@
       async function endTeacherVideo(silent) {
         await submitRealtimeCallSummary();
         stopAllRealtime();
-        if (teacherLocalStream) { teacherLocalStream.getTracks().forEach(function(t) { t.stop(); }); teacherLocalStream = null; }
-        if (teacherPeerConn) { teacherPeerConn.close(); teacherPeerConn = null; }
-        pendingTeacherCandidates = [];
+        if (agoraTeacherClient) { agoraTeacherClient.leave().catch(function() {}); agoraTeacherClient = null; }
+        if (teacherVideoTrack) { teacherVideoTrack.close(); teacherVideoTrack = null; }
+        if (teacherAudioTrack) { teacherAudioTrack.close(); teacherAudioTrack = null; }
         if (teacherLocalVideo.value) teacherLocalVideo.value.srcObject = null;
         if (teacherRemoteVideo.value) teacherRemoteVideo.value.srcObject = null;
+        remoteMediaStream = null;
         resetAudioDiag();
         teacherInCall.value = false;
         if (!silent && socket) socket.emit('video_call_end', { room: videoRoom.value, sender: 'teacher' });
       }
 
       function toggleTeacherVideo() {
-        if (teacherLocalStream) { var t = teacherLocalStream.getVideoTracks()[0]; if (t) { t.enabled = !t.enabled; teacherVideoEnabled.value = t.enabled; } }
+        if (!teacherVideoTrack) return;
+        var next = !teacherVideoEnabled.value;
+        teacherVideoTrack.setEnabled(next);
+        teacherVideoEnabled.value = next;
       }
       function toggleTeacherAudio() {
-        if (teacherLocalStream) { var t = teacherLocalStream.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; teacherAudioEnabled.value = t.enabled; refreshAudioDiag('local', teacherLocalStream); } }
+        if (!teacherAudioTrack) return;
+        var next = !teacherAudioEnabled.value;
+        teacherAudioTrack.setEnabled(next);
+        teacherAudioEnabled.value = next;
+        refreshAudioDiag('local', combineTrackStreams([teacherVideoTrack, teacherAudioTrack]));
       }
 
       async function openTeacherVideo() {
@@ -907,7 +935,7 @@
         var videoEl = teacherRemoteVideo.value;
         if (!videoEl || !videoEl.srcObject) { Toast.error('\u8bf7\u5148\u8fde\u63a5\u89c6\u9891\u901a\u8bdd'); return; }
         currentYoloEmotion.value = null;
-        autoStartRealtimeEmotion(videoEl.srcObject, videoEl);
+        autoStartRealtimeEmotion(remoteMediaStream || videoEl.srcObject, videoEl);
         Toast.success('\u5b9e\u65f6\u60c5\u7eea\u76d1\u6d4b\u5df2\u5f00\u542f');
       }
 

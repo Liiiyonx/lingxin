@@ -38,7 +38,10 @@ def login():
         _audit_login_failure(username, ip, kind="staff")
         return jsonify({"success": False, "message": "用户名或密码错误"}), 401
 
+    # 顶号登录：覆盖旧会话并吊销旧 token，不再拒绝第二次登录
+    common.auth.supersede_session("staff", user["username"])
     token = common.auth.generate_token(user)
+    common.auth.register_session("staff", user["username"], token)
 
     return jsonify({
         "success": True,
@@ -67,6 +70,7 @@ def logout():
     try:
         if token:
             common.auth.revoke_token(token)
+            common.auth.clear_session(token)
     except Exception as exc:
         logger.error("令牌注销失败: %s", exc)
 
@@ -103,7 +107,10 @@ def student_login():
         _audit_login_failure(student_id, ip, kind="student")
         return jsonify({"success": False, "message": "学号或密码错误"}), 401
 
+    # 顶号登录：覆盖旧会话并吊销旧 token，不再拒绝第二次登录
+    common.auth.supersede_session("student", student["student_id"])
     token = common.auth.generate_student_token(student)
+    common.auth.register_session("student", student["student_id"], token)
 
     return jsonify({
         "success": True,
@@ -156,6 +163,7 @@ def student_register():
 
     # 生成token
     token = common.auth.generate_student_token(student)
+    common.auth.register_session("student", student["student_id"], token)
 
     return jsonify({
         "success": True,

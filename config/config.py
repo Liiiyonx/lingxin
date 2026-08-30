@@ -49,6 +49,13 @@ class EmotionConfig:
     REALTIME_MIN_CONFIDENCE_LLM: float = 0.65  # 低于此置信度调用LLM
 
 
+class AgoraConfig:
+    APP_ID: str = os.getenv("AGORA_APP_ID", "")
+    TOKEN: str = os.getenv("AGORA_TOKEN", "")
+    APP_CERT: str = os.getenv("AGORA_APP_CERT", "")
+    TOKEN_EXPIRE_HOURS: int = int(os.getenv("AGORA_TOKEN_EXPIRE_HOURS", "24"))
+
+
 class SecurityConfig:
     ROLES: list = ["super_admin", "student_affairs", "counselor"]
     TOKEN_EXPIRE_HOURS: int = 24
@@ -61,6 +68,7 @@ def load_config():
         "llm": LLMConfig(),
         "rag": RAGConfig(),
         "emotion": EmotionConfig(),
+        "agora": AgoraConfig(),
         "security": SecurityConfig(),
     }
 
@@ -82,6 +90,10 @@ EMBEDDING_MODEL = RAGConfig.EMBEDDING_MODEL
 CHROMA_PERSIST_DIR = RAGConfig.PERSIST_DIR
 COLLECTION_NAME = RAGConfig.COLLECTION_NAME
 
+AGORA_APP_ID = AgoraConfig.APP_ID
+AGORA_TOKEN = AgoraConfig.TOKEN
+AGORA_APP_CERT = AgoraConfig.APP_CERT
+
 SECRET_KEY = ApplicationConfig.SECRET_KEY
 DEBUG = ApplicationConfig.DEBUG
 LOG_LEVEL = "INFO"
@@ -94,3 +106,7 @@ class Config:
     DASHSCOPE_API_KEY = LLMConfig.DASHSCOPE_API_KEY
     BASE_URL = LLMConfig.BASE_URL
     MODEL = LLMConfig.DEFAULT_MODEL
+    AGORA_APP_ID = AgoraConfig.APP_ID
+    AGORA_TOKEN = AgoraConfig.TOKEN
+    AGORA_APP_CERT = AgoraConfig.APP_CERT
+    AGORA_TOKEN_EXPIRE_HOURS = AgoraConfig.TOKEN_EXPIRE_HOURS

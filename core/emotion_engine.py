@@ -18,8 +18,10 @@ from typing import Dict, List, Optional, Generator, Tuple, Any
 
 import numpy as np
 import soundfile as sf
-import torch
-from transformers import AutoModelForAudioClassification, AutoProcessor
+
+# 注：本模块不引入 torch/transformers —— 只做规则融合与风险联动，
+# 声学推理由 core/speech_emotion.py（funasr，懒加载 + 优雅降级）承担，
+# 便于小内存云服务器跳过重型 ML 依赖部署。
 
 logger = logging.getLogger(__name__)
 

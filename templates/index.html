@@ -470,7 +470,7 @@
                             </div>
                             <!-- 右侧聊天 -->
                             <div class="chat-main">
-                                <div v-if="teacherSelected" class="flex items-center justify-between p-3 px-4 border-b">
+                                <div v-if="teacherSelected" class="chat-call-header flex items-center justify-between p-3 px-4 border-b">
                                     <div class="flex items-center gap-3"><div class="avatar">{{ teacherSelected.name[0] }}</div><span class="font-bold text-base">{{ teacherSelected.name }}<span v-if="teacherSelected.student_id" class="text-sm text-muted font-normal"> #{{ teacherSelected.student_id }}</span></span></div>
                                     <div class="flex gap-2 items-center">
                                         <button @click="analyzeCounselorGuidance()" :disabled="guidanceLoading" class="btn btn-sm" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:white">{{ guidanceLoading?'分析中...':'🧠 AI辅导分析' }}</button>
@@ -537,7 +537,7 @@
                                     </div>
                                 </div>
                                 <!-- 来电 -->
-                                <div v-if="incomingCall" class="flex items-center justify-between p-3 bg-brand-50 border-b" style="border-bottom:2px solid var(--brand-500)"><span>📞 {{ incomingCall.student_name }} 正在呼叫...</span><div class="flex gap-2"><button @click="acceptVideoCall" class="btn btn-success btn-xs">接听</button><button @click="rejectVideoCall" class="btn btn-danger btn-xs">拒绝</button></div></div>
+                                <div v-if="incomingCall" class="incoming-call-bar flex items-center justify-between p-3 bg-brand-50 border-b" style="border-bottom:2px solid var(--brand-500)"><span>📞 {{ incomingCall.student_name }} 正在呼叫...</span><div class="flex gap-2"><button @click="acceptVideoCall" class="btn btn-success btn-xs">接听</button><button @click="rejectVideoCall" class="btn btn-danger btn-xs">拒绝</button></div></div>
                                 <!-- AI分析结果 -->
                                 <div v-if="realtimeCallSummary" class="dialog-mask" @click.self="realtimeCallSummary=null"><div class="dialog-box" style="max-width:560px">
                                     <div class="flex justify-between items-center mb-4"><h3 class="m-0">📊 本次视频情绪总结</h3><button @click="realtimeCallSummary=null" class="btn btn-ghost btn-sm">关闭</button></div>
@@ -746,6 +746,10 @@
 <!-- face-api.js 按需加载 (仅视频通话) -->
 <script id="faceapi-loader">
 (function(){window._loadFaceAPI=function(cb){if(window.faceapi)return cb();var s=document.createElement('script');s.src='/static/js/vendor/face-api.min.js';s.onload=cb;s.onerror=function(){var f=document.createElement('script');f.src='https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';f.onload=cb;document.head.appendChild(f);};document.head.appendChild(s);};})();
+</script>
+<!-- Agora RTC 按需加载 (视频通话) -->
+<script id="agora-loader">
+(function(){window._loadAgoraRTC=function(cb){if(window.AgoraRTC)return cb();var s=document.createElement('script');s.src='/static/js/vendor/AgoraRTC_N.js?v=4.22.2';s.onload=cb;s.onerror=function(){cb();};document.head.appendChild(s);};})();
 </script>
 <!-- 应用工具 -->
 <script src="/static/js/utils/icons.js?v=4.1"></script>

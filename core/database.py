@@ -2492,6 +2492,9 @@ class AuthManager:
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
         self.serializer = Serializer(self.SECRET_KEY)
+        # 活跃会话注册表：单点登录用。key=(user_type, user_id) -> token。
+        # 单机演示环境内存存储即可；多进程(gunicorn 多 worker)部署时需改为数据库表。
+        self._active_sessions = {}
 
     # ── 密码处理 ──────────────────────────────────────────
 
@@ -2607,6 +2610,54 @@ class AuthManager:
             session.commit()
         return True
 
+    # ── 活跃会话（单点登录）────────────────────────────
+
+    def _session_key(self, user_type, user_id):
+        return (user_type, user_id)
+
+    def is_logged_in(self, user_type, user_id):
+        """判断该账号当前是否有有效的活跃会话。"""
+        key = self._session_key(user_type, user_id)
+        token = self._active_sessions.get(key)
+        if not token:
+            return False
+        # 旧 token 已失效（过期 / 被吊销）则自动释放，避免账号被永久占用
+        if self.verify_token(token) is None:
+            self._active_sessions.pop(key, None)
+            return False
+        return True
+
+    def supersede_session(self, user_type, user_id):
+        """顶号登录：吊销旧会话 token 并释放活跃会话，允许新登录直接覆盖。"""
+        key = self._session_key(user_type, user_id)
+        old_token = self._active_sessions.get(key)
+        if old_token:
+            try:
+                self.revoke_token(old_token)
+            except Exception:
+                pass
+            self._active_sessions.pop(key, None)
+
+    def register_session(self, user_type, user_id, token):
+        """登记活跃会话"""
+        self._active_sessions[self._session_key(user_type, user_id)] = token
+
+    def clear_session(self, token):
+        """根据 token 释放对应账号的活跃会话（登出 / 会话失效时调用）"""
+        try:
+            data = self.serializer.loads(token, max_age=None)
+        except Exception:
+            return
+        user_type = data.get("user_type") or ("student" if data.get("role") == "student" else "staff")
+        # 用业务唯一标识（学号/用户名）而非数据库自增 id，避免删除重建后 id 重用导致会话错乱
+        if user_type == "student":
+            uid = data.get("student_id_str") or data.get("student_id")
+        else:
+            uid = data.get("username") or data.get("user_id")
+        key = self._session_key(user_type, uid)
+        if self._active_sessions.get(key) == token:
+            self._active_sessions.pop(key, None)
+
     def _is_token_revoked(self, jti: str) -> bool:
         """检查Token是否已被撤销"""
         if not jti:
@@ -2631,7 +2682,8 @@ class AuthManager:
         return student
 
     def generate_student_token(self, student) -> str:
-        """生成学生Token"""
+        """生成学生Token（含jti，支持登出吊销）"""
+        import uuid
         sid = student["id"] if isinstance(student, dict) else student.id
         student_id = student["student_id"] if isinstance(student, dict) else student.student_id
         name = student["name"] if isinstance(student, dict) else student.name
@@ -2641,6 +2693,7 @@ class AuthManager:
             "name": name,
             "role": "student",
             "user_type": "student",
+            "jti": str(uuid.uuid4()),
         })
 
 # ===================================================================

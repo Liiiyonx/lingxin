@@ -160,7 +160,7 @@
           } else {
             Toast.error(d.message || '登录失败，请检查用户名和密码');
           }
-        } catch (e) { if (e.message !== 'unauthorized') Toast.error('服务连接失败，请确认服务器已启动'); }
+        } catch (e) { if (e.message !== 'unauthorized') Toast.error(e.message || '登录失败，请稍后重试'); }
         loginLoading.value = false;
       }
 
@@ -183,7 +183,7 @@
             // Socket在后台初始化，不阻塞渲染
             setTimeout(function(){ initSocket(); initStudentVideo(); }, 100);
           } else { Toast.error(d.message || '登录失败，请检查学号和密码'); }
-        } catch (e) { if (e.message !== 'unauthorized') Toast.error('服务连接失败，请确认服务器已启动'); }
+        } catch (e) { if (e.message !== 'unauthorized') Toast.error(e.message || '登录失败，请稍后重试'); }
         loginLoading.value = false;
       }
 
@@ -241,6 +241,7 @@
       }
 
       function handleLogout() {
+        try { API.logout(); } catch (e) {}
         localStorage.removeItem('token');
         localStorage.removeItem('user_type');
         localStorage.removeItem('current_user');

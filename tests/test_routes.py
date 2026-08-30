@@ -61,11 +61,50 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertTrue(self.token)
 
     def test_03_logout(self):
-        # 用独立 token 测试注销，避免影响共享 token
+        # 先注销共享 token 释放会话，再验证注销流程。
+        self.client.post("/api/auth/logout", headers=self.h)
         tok = self.client.post("/api/auth/login",
                                json={"username": "admin", "password": "admin123"}).get_json()["data"]["token"]
         r = self.client.post("/api/auth/logout", headers={"Authorization": "Bearer " + tok})
         self.assertIn(r.status_code, {200, 400})
+        # 恢复共享 token，供后续测试使用
+        newtok = self.client.post("/api/auth/login",
+                                  json={"username": "admin", "password": "admin123"}).get_json()["data"]["token"]
+        type(self).token = newtok
+        type(self).h = {"Authorization": "Bearer " + newtok}
+
+    def test_03b_staff_repeat_login_supersedes(self):
+        # 顶号登录：重复登录应 200 并返回新 token，旧 token 立即失效
+        r1 = self.client.post("/api/auth/login",
+                              json={"username": "admin", "password": "admin123"})
+        self.assertEqual(r1.status_code, 200)
+        token_a = r1.get_json()["data"]["token"]
+        r2 = self.client.post("/api/auth/login",
+                              json={"username": "admin", "password": "admin123"})
+        self.assertEqual(r2.status_code, 200)
+        token_b = r2.get_json()["data"]["token"]
+        self.assertNotEqual(token_a, token_b)
+        old = self.client.get("/api/alert/list", headers={"Authorization": "Bearer " + token_a})
+        self.assertEqual(old.status_code, 401, "旧 token 应被吊销")
+        # 恢复共享 token，供后续测试使用
+        newtok = self.client.post("/api/auth/login",
+                                  json={"username": "admin", "password": "admin123"}).get_json()["data"]["token"]
+        type(self).token = newtok
+        type(self).h = {"Authorization": "Bearer " + newtok}
+
+    def test_03c_student_repeat_login_supersedes(self):
+        # 学生端同样支持顶号：旧 token 应被吊销
+        r1 = self.client.post("/api/student/login",
+                              json={"student_id": "20240001", "password": "123456"})
+        self.assertEqual(r1.status_code, 200)
+        token_a = r1.get_json()["data"]["token"]
+        r2 = self.client.post("/api/student/login",
+                              json={"student_id": "20240001", "password": "123456"})
+        self.assertEqual(r2.status_code, 200)
+        token_b = r2.get_json()["data"]["token"]
+        self.assertNotEqual(token_a, token_b)
+        old = self.client.get("/api/student/profile", headers={"Authorization": "Bearer " + token_a})
+        self.assertEqual(old.status_code, 401, "学生旧 token 应被吊销")
 
     # ---------- 个人资料 ----------
     def test_04_profile_get(self):
@@ -172,6 +211,20 @@ class RouteSmokeTest(unittest.TestCase):
 
     def test_35_dashboard(self):
         self.req("get", "/api/system/dashboard", {200})
+
+    def test_35b_agora_token_requires_params(self):
+        r = self.client.get("/api/video/agora-token")
+        self.assertEqual(r.status_code, 400, "缺少 channel/uid 应返回 400")
+
+    def test_35c_agora_token(self):
+        r = self.client.get("/api/video/agora-token?channel=video_smoke&uid=20240001")
+        self.assertEqual(r.status_code, 200)
+        data = r.get_json()
+        self.assertIn(data.get("mode"), {"no_auth", "app_cert", "static_token"})
+        if data.get("mode") == "no_auth":
+            self.assertIsNone(data.get("token"))
+        else:
+            self.assertTrue(data.get("token"), "app_cert/static_token 模式应返回 token")
 
     # ---------- 学生 ----------
     def test_36_student_list(self):

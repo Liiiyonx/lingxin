@@ -1,0 +1,14 @@
+[Unit]
+Description=Lingxin Campus Mind Platform
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/lingxin
+EnvironmentFile=/opt/lingxin/.env
+ExecStart=/opt/lingxin/venv/bin/gunicorn -w 1 --threads 50 -b 127.0.0.1:5000 app:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -10,7 +10,8 @@ if ROOT_DIR not in sys.path:
 from flask import Flask, send_from_directory, jsonify, send_file, request, Response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from config.config import ApplicationConfig, load_config
+from config.config import AgoraConfig, ApplicationConfig, load_config
+from config.agora_token import Role_Publisher, build_token_with_user_account
 from api.routes import api, set_socketio
 
 logging.basicConfig(
@@ -19,6 +20,20 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger("campus_mind")
+
+
+def _allowed_origins():
+    port = ApplicationConfig.PORT
+    raw = os.getenv(
+        "ALLOWED_ORIGINS",
+        f"http://localhost:{port},http://127.0.0.1:{port}"
+    )
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    # 当前主机端口永远放行，方便本地换端口调试，也避免 .env 固定端口导致 WebSocket 被拒
+    for local in (f"http://localhost:{port}", f"http://127.0.0.1:{port}"):
+        if local not in origins:
+            origins.append(local)
+    return origins
 
 
 def create_app():
@@ -40,10 +55,11 @@ def create_app():
     app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
     app.config["JSON_AS_ASCII"] = False
 
-    CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5000", "http://127.0.0.1:5000"]}})
+    allowed_origins = _allowed_origins()
+    CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 
     # 初始化WebSocket
-    socketio = SocketIO(app, cors_allowed_origins=["http://localhost:5000", "http://127.0.0.1:5000"], async_mode='threading')
+    socketio = SocketIO(app, cors_allowed_origins=allowed_origins, async_mode='threading')
 
     app.register_blueprint(api)
 
@@ -76,11 +92,18 @@ def create_app():
     # --- WebRTC 视频通话信令 ---
     @socketio.on('video_call_request')
     def handle_video_call_request(data):
-        """学生发起视频呼叫 → 广播给所有老师端（含房间号）"""
+        """视频呼叫请求：学生→定向推送指定辅导员，其余→广播（含房间号）"""
         room = data.get('room', 'video_room')
         join_room(room)
-        emit('incoming_video_call', data, broadcast=True)
-        logger.info(f"视频呼叫请求: 学生 {data.get('student_name')} room={room}")
+        counselor_id = data.get('counselor_id')
+        if data.get('caller') == 'student' and counselor_id:
+            # 学生呼叫定向到指定辅导员（teacher_chat_{user_id} 房间）
+            target_room = 'teacher_chat_' + str(counselor_id)
+            emit('incoming_video_call', data, room=target_room)
+            logger.info(f"视频呼叫请求: 学生 {data.get('student_name')} → 辅导员{counselor_id} room={room}")
+        else:
+            emit('incoming_video_call', data, broadcast=True)
+            logger.info(f"视频呼叫请求: {data.get('caller')} room={room}")
 
     @socketio.on('video_call_accept')
     def handle_video_call_accept(data):
@@ -169,6 +192,12 @@ def create_app():
         return jsonify({
             "name": ApplicationConfig.APP_NAME,
             "version": ApplicationConfig.VERSION,
+            "video": {
+                "agora": {
+                    "app_id": AgoraConfig.APP_ID,
+                    "token": AgoraConfig.TOKEN or None,
+                }
+            },
             "endpoints": {
                 "auth": "/api/auth/login",
                 "conversations": "/api/conversation/list",
@@ -178,6 +207,28 @@ def create_app():
                 "dashboard": "/api/system/dashboard",
             }
         })
+
+    @app.route("/api/video/agora-token")
+    def agora_token():
+        channel = (request.args.get("channel") or "").strip()
+        uid = (request.args.get("uid") or "").strip()
+        if not channel or not uid or len(channel.encode("utf-8")) > 64:
+            return jsonify({"error": "channel and uid are required", "code": 400}), 400
+        if AgoraConfig.TOKEN:
+            # 控制台临时 Token：优先于无鉴权，直接复用同一把 token
+            return jsonify({"token": AgoraConfig.TOKEN, "mode": "static_token"})
+        if not AgoraConfig.APP_CERT:
+            return jsonify({"token": None, "mode": "no_auth"})
+        expire_seconds = AgoraConfig.TOKEN_EXPIRE_HOURS * 3600
+        token = build_token_with_user_account(
+            AgoraConfig.APP_ID,
+            AgoraConfig.APP_CERT,
+            channel,
+            uid,
+            Role_Publisher,
+            expire_seconds,
+        )
+        return jsonify({"token": token, "mode": "app_cert", "expires_in": expire_seconds})
 
     @app.errorhandler(404)
     def not_found(e):
@@ -219,8 +270,11 @@ def print_banner(app):
     print()
 
 
+# 模块级应用实例：供 gunicorn（systemd 生产部署）导入使用
+app = create_app()
+
+
 if __name__ == "__main__":
-    app = create_app()
     print_banner(app)
     app.socketio.run(
         app,

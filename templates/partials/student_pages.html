@@ -35,10 +35,10 @@
                             <div v-for="contact in messageContacts" :key="contact.id" @click="selectContactHandler(contact)" class="flex items-center gap-3 p-3 cursor-pointer border-b border-light transition" :class="{'bg-brand-50':selectedContact&&selectedContact.id===contact.id}"><div class="avatar">{{ contact.name[0] }}</div><div class="flex-1 min-w-0"><div class="flex justify-between items-center"><span class="font-semibold text-sm">{{ contact.name }}老师</span><span v-if="contact.unread_count" class="badge badge-danger badge-sm">{{ contact.unread_count }}</span></div><div v-if="contact.last_message" class="text-xs text-muted mt-1 truncate">{{ contact.last_message.content }}</div></div></div>
                             <div v-if="!messageContacts.length" class="empty-state p-8">暂无消息</div></div>
                         <div class="chat-main">
-                            <div v-if="selectedContact" class="flex items-center justify-between p-3 px-4 border-b"><span class="font-bold text-base">{{ selectedContact.name }}老师 <span v-if="contactPresence" class="chat-online-pill" :class="contactPresence.online?'online':'ai'"><i></i>{{ contactPresence.online ? '在线' : (contactPresence.dh_enabled ? 'AI分身·'+(contactPresence.dh_name||'小聆')+'值班中' : '离线') }}</span></span>
+                            <div v-if="selectedContact" class="chat-call-header flex items-center justify-between p-3 px-4 border-b"><span class="font-bold text-base">{{ selectedContact.name }}老师 <span v-if="contactPresence" class="chat-online-pill" :class="contactPresence.online?'online':'ai'"><i></i>{{ contactPresence.online ? '在线' : (contactPresence.dh_enabled ? 'AI分身·'+(contactPresence.dh_name||'小聆')+'值班中' : '离线') }}</span></span>
                                 <div class="flex gap-2 items-center"><button @click="crisisReport()" class="btn btn-sm btn-danger">🆘 紧急求助</button><button @click="startVideoCall" v-if="!isInCall" class="btn btn-sm" style="background:var(--brand-gradient);color:white">📹 视频</button><template v-else><span class="emotion-live-indicator active"></span><span class="text-xs text-success">通话中</span><button @click="toggleVideo" class="btn btn-xs" :class="isVideoEnabled?'btn-outline':'btn-danger'">📷</button><button @click="toggleAudio" class="btn btn-xs" :class="isAudioEnabled?'btn-outline':'btn-danger'">🎤</button><button @click="endVideoCall" class="btn btn-danger btn-xs">挂断</button></template></div></div>
                             <!-- 微信式视频：大画面(对方) + 右下小窗(自己) -->
-                            <div v-if="isInCall" class="relative bg-dark" style="height:400px;border-radius:8px;overflow:hidden">
+                            <div v-if="isInCall" class="student-video-stage relative bg-dark">
                                 <video ref="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
                                 <div class="video-label">{{ selectedContact?selectedContact.name+'老师':'对方' }}</div>
                                 <div class="absolute" style="bottom:16px;right:16px;width:120px;height:160px;border-radius:8px;overflow:hidden;border:2px solid rgba(255,255,255,0.3);box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:10">
@@ -46,7 +46,7 @@
                                     <div class="video-label">我</div>
                                 </div>
                             </div>
-                                                        <div v-if="incomingStudentCall" class="flex items-center justify-between p-3 mx-4 my-2 bg-brand-50 rounded-md border" style="border-color:var(--brand-500)"><span class="font-semibold">📞 {{ incomingStudentCall.teacher_name||'老师' }} 邀请你视频通话</span><div class="flex gap-2"><button @click="acceptStudentCall" class="btn btn-success btn-xs">接听</button><button @click="rejectStudentCall" class="btn btn-danger btn-xs">拒绝</button></div></div>
+                                                        <div v-if="incomingStudentCall" class="incoming-call-bar flex items-center justify-between p-3 mx-4 my-2 bg-brand-50 rounded-md border" style="border-color:var(--brand-500)"><span class="font-semibold">📞 {{ incomingStudentCall.teacher_name||'老师' }} 邀请你视频通话</span><div class="flex gap-2"><button @click="acceptStudentCall" class="btn btn-success btn-xs">接听</button><button @click="rejectStudentCall" class="btn btn-danger btn-xs">拒绝</button></div></div>
 <div v-if="selectedContact" class="flex-1 overflow-y-auto p-4 bg-tertiary" ref="studentMsgRef"><div v-for="msg in chatMessages" :key="msg.id" class="flex items-start mb-3" :class="msg.sender_type==='student'?'justify-end':'justify-start'"><div v-if="msg.sender_type==='assistant'" class="dh-log-ai" style="width:30px;height:30px;font-size:15px"><dh-face :mood="msg.id===dhSpeakingMessageId?'speaking':'neutral'" size="sm"></dh-face></div><div class="bubble" :class="msg.sender_type==='student'?'bubble-sent':(msg.sender_type==='assistant'?'bubble-ai':'bubble-received')"><span v-if="msg.sender_type==='assistant'" class="ai-badge">🤖 AI分身</span> {{ msg.content }}<button v-if="msg.sender_type==='assistant'" class="msg-speak-btn" @click.stop="speakDigitalHuman(msg.content, null, msg.id)" title="朗读这条回复">🔊</button><div class="bubble-time">{{ Helpers.formatTime(msg.created_at) }}</div></div></div><div v-if="assistantTyping" class="flex items-start mb-3"><div class="dh-log-ai ai-typing-avatar" style="width:30px;height:30px;font-size:15px"><dh-face mood="thinking" size="sm"></dh-face></div><div class="bubble bubble-ai ai-typing-bubble"><span class="ai-badge">🤖 AI分身</span><span class="typing-dots"><i></i><i></i><i></i></span></div></div></div>
                             <div v-else class="flex-1 flex items-center justify-center text-muted">👈 选择联系人开始聊天</div>
                             <div v-if="selectedContact" class="p-3 border-t bg-secondary">
@@ -56,17 +56,15 @@
                     </div></div>
                 </div>
 
-                </div>
-
                 <!-- 学生预约 -->
-                <div v-if="page==='studentAppointment'" class="fade-in">
+                <div v-if="page==='studentAppointment'" class="fade-in" style="max-width:900px;margin:0 auto">
                     <div class="card"><div class="card-header"><span class="card-title">📅 预约咨询</span></div><div class="two-col gap-6">
                         <div><h4 class="mb-4 font-semibold">创建新预约</h4><div class="form-group"><label>选择辅导员</label><select class="input" v-model="newAppointment.counselor_id"><option value="">请选择辅导员</option><option v-for="c in counselors" :key="c.id" :value="c.id">{{ c.display_name }} - {{ c.college }}</option></select></div><div class="form-group"><label>预约时间</label><input class="input" v-model="newAppointment.appointment_time" type="datetime-local"></div><div class="form-group"><label>咨询原因</label><textarea class="input" v-model="newAppointment.reason" rows="3" placeholder="请简要描述咨询原因..."></textarea></div><button @click="createAppointment" class="btn btn-primary w-full">提交预约</button></div>
                         <div><h4 class="mb-4 font-semibold">我的预约</h4><div v-for="appt in appointments" :key="appt.id" class="p-4 bg-tertiary rounded-md mb-3"><div class="flex justify-between items-center mb-2"><span class="font-semibold">{{ appt.counselor_name||'辅导员' }}</span><span class="badge" :class="'badge-'+({confirmed:'success',pending:'warning',completed:'brand',cancelled:'muted'}[appt.status])">{{ {pending:'待确认',confirmed:'已确认',completed:'已完成',cancelled:'已取消'}[appt.status] }}</span></div><div class="text-sm text-secondary"><div>时间：{{ appt.appointment_time }}</div><div v-if="appt.reason">原因：{{ appt.reason }}</div></div></div><div v-if="!appointments.length" class="empty-state p-8">暂无预约记录</div></div></div></div>
                 </div>
 
                 <!-- 辅导员预约管理 -->
-                <div v-if="page==='teacherAppointments'" class="fade-in">
+                <div v-if="page==='teacherAppointments'" class="fade-in" style="max-width:900px;margin:0 auto">
                     <div class="page-header">
                         <div><h3>预约管理</h3><p class="text-muted text-sm mt-1">确认预约会自动进入待办，完成后沉淀为谈心记录</p></div>
                         <button class="btn btn-outline btn-sm" @click="loadAppointments()">🔄 刷新</button>
@@ -104,14 +102,14 @@
                 </div>
 
                 <!-- 心理测评（分步导航） -->
-                <div v-if="page==='studentAssessment'" class="fade-in">
+                <div v-if="page==='studentAssessment'" class="fade-in" style="max-width:900px;margin:0 auto">
                     <div v-if="!assessmentResult"><div class="card"><div class="card-header"><span class="card-title">📋 心理状态自评（PHQ-9 / GAD-7 / ISI）</span><span class="text-xs text-muted">共23题 · 约5-8分钟</span></div>
                         <div class="assess-progress-bar"><div class="assess-progress-fill" :style="{width:assessmentProgress+'%'}"></div></div>
                         <div class="assessment-steps"><div class="assess-step" :class="{active:assessmentStep===0, done:assessmentStep>0}" @click="assessmentStep=0"><span class="assess-step-num">1</span> PHQ-9 抑郁</div><span class="assess-step-arrow">→</span><div class="assess-step" :class="{active:assessmentStep===1, done:assessmentStep>1}" @click="assessmentStep=1"><span class="assess-step-num">2</span> GAD-7 焦虑</div><span class="assess-step-arrow">→</span><div class="assess-step" :class="{active:assessmentStep===2}" @click="assessmentStep=2"><span class="assess-step-num">3</span> ISI 睡眠</div></div>
                         <h4 class="mb-3 text-brand font-semibold">{{ assessmentStepLabel }}</h4>
                         <p class="text-secondary text-sm mb-4">请根据<span class="font-semibold">过去两周</span>的实际情况如实作答。</p>
-                        <div v-for="(q,i) in currentStepQuestions" :key="currentStepStart+i" class="mb-4 p-3 bg-tertiary rounded-md"><div class="font-semibold mb-2 text-sm">{{ currentStepStart+i+1 }}. {{ q.text }}</div><div class="flex gap-2 flex-wrap">
-                            <label v-for="(opt,j) in assessmentOptions" :key="j" :style="{padding:'8px 14px',borderRadius:'var(--radius-sm)',cursor:'pointer',fontSize:'var(--text-xs)',border:'2px solid',borderColor:assessmentAnswers[currentStepStart+i]===j?'var(--brand-500)':'var(--border-color)',background:assessmentAnswers[currentStepStart+i]===j?'var(--brand-50)':'var(--bg-secondary)',minWidth:'44px',textAlign:'center',transition:'all var(--transition-fast)'}"><input type="radio" :value="j" v-model="assessmentAnswers[currentStepStart+i]" style="position:absolute;opacity:0" :aria-label="opt">{{ opt }}</label></div></div>
+                        <div v-for="(q,i) in currentStepQuestions" :key="currentStepStart+i" class="mb-4 p-3 bg-tertiary rounded-md"><div class="font-semibold mb-2 text-sm">{{ currentStepStart+i+1 }}. {{ q.text }}</div><div class="flex gap-2">
+                            <label v-for="(opt,j) in assessmentOptions" :key="j" :style="{padding:'8px 14px',borderRadius:'var(--radius-sm)',cursor:'pointer',fontSize:'var(--text-xs)',border:'2px solid',borderColor:assessmentAnswers[currentStepStart+i]===j?'var(--brand-500)':'var(--border-color)',background:assessmentAnswers[currentStepStart+i]===j?'var(--brand-50)':'var(--bg-secondary)',flex:'1',minWidth:'44px',textAlign:'center',transition:'all var(--transition-fast)'}"><input type="radio" :value="j" v-model="assessmentAnswers[currentStepStart+i]" style="position:absolute;opacity:0" :aria-label="opt">{{ opt }}</label></div></div>
                         <div class="flex justify-between items-center mt-5"><button v-if="assessmentStep>0" @click="goToPrevStep" class="btn btn-outline btn-sm">← 上一部分</button><div v-else></div><div class="flex gap-3 items-center"><span class="text-xs text-muted">进度 {{ assessmentProgress }}%</span><button v-if="assessmentStep<2" @click="goToNextStep" class="btn btn-sm" style="background:var(--brand-gradient);color:white">下一部分 →</button><button v-else @click="submitAssessment" :disabled="assessmentSubmitting||!canProceedToNext()" class="btn btn-success btn-sm">{{ assessmentSubmitting?'提交中...':'✓ 提交测评' }}</button></div></div></div></div>
                     <!-- 测评结果 -->
                     <div v-else class="fade-in"><div class="card text-center mb-4"><div style="font-size:48px;margin-bottom:12px">{{ assessmentResult.suggestions&&assessmentResult.suggestions.length>1?'🟡':'🟢' }}</div><h3 class="mb-4">测评完成</h3>
@@ -128,6 +126,6 @@
                 </div>
 
                 <!-- 学生个人中心 -->
-                <div v-if="page==='studentProfile'" class="fade-in">
+                <div v-if="page==='studentProfile'" class="fade-in" style="max-width:900px;margin:0 auto">
                     <div class="card"><div class="card-header"><span class="card-title">个人中心</span></div><div class="flex gap-6 items-start"><div class="avatar avatar-xl">{{ (currentUser.name||'?')[0] }}</div><div class="flex-1"><h3 class="mb-3 m-0">{{ currentUser.name }}</h3><div class="text-secondary leading-loose text-sm"><div>学号：{{ currentUser.student_id }}</div><div>学院：{{ currentUser.college||'未设置' }}</div><div>班级：{{ currentUser.class_name||'未设置' }}</div></div></div></div></div>
                 </div>

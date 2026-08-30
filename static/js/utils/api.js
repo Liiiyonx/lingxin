@@ -116,6 +116,15 @@ window.API = (function() {
         throw e;
       }
     },
+    // 登出吊销：发请求但不处理 401/网络错误，避免重复触发 unauthorized
+    logout: function() {
+      const t = token;
+      if (!t) return Promise.resolve();
+      return fetch(BASE + '/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t }
+      }).catch(function() {});
+    },
     setToken: function(t) { token = t; },
     getToken: function() { return token; },
     on: emitter.on.bind(emitter),
