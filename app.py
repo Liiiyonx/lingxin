@@ -138,6 +138,13 @@ def create_app():
         emit('video_call_ended', data, room=room)
         logger.info(f"视频通话结束: room={room}")
 
+    @socketio.on('video_call_reject')
+    def handle_video_call_reject(data):
+        """拒绝视频呼叫：向呼叫房间回执，避免发起方一直等待"""
+        room = data.get('room', 'video_room')
+        emit('video_call_rejected', data, room=room)
+        logger.info(f"视频呼叫已拒绝: room={room}")
+
     app.socketio = socketio
     set_socketio(socketio)
 

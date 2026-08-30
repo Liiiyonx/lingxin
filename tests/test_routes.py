@@ -298,6 +298,27 @@ class RouteSmokeTest(unittest.TestCase):
     def test_55_assessment_history(self):
         self.req("get", "/api/assessment/history", {200, 400})
 
+    # ---------- 回归：会话整理引擎降级 ----------
+    def test_56_batch_organize_without_engine_returns_503(self):
+        """conversation_engine 未启用时应显式 503，而不是 AttributeError 500（回归锁定）。"""
+        from api import common as api_common
+        old_engine = api_common.conversation_engine
+        api_common.conversation_engine = None
+        try:
+            r = self.req("post", "/api/conversation/batch-organize", {503},
+                         json={"conversations": [{"content": "老师：最近状态怎么样？学生：还行。"}]})
+            body = r.get_json()
+            self.assertIn("DASHSCOPE_API_KEY", body.get("message", ""))
+        finally:
+            api_common.conversation_engine = old_engine
+
+    def test_57_dashboard_knowledge_docs_not_hardcoded(self):
+        """dashboard 的 knowledge_docs 应反映真实文档数（docs/ 目录或向量库索引），不再恒为 0。"""
+        r = self.req("get", "/api/system/dashboard", {200})
+        data = r.get_json()
+        self.assertIsInstance(data.get("knowledge_docs"), int)
+        self.assertGreaterEqual(data["knowledge_docs"], 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

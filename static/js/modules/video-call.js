@@ -211,6 +211,11 @@
           Toast.info((data.teacher_name || '\u8001\u5e08') + ' \u9080\u8bf7\u4f60\u89c6\u9891\u901a\u8bdd');
         });
         socket.on('video_call_ended', function(data) { if (!data || data.sender !== 'student') endVideoCall(true); });
+        socket.on('video_call_rejected', function(data) {
+          if (!data || data.caller !== 'student') return;
+          Toast.info('\u5bf9\u65b9\u5df2\u62d2\u7edd\u89c6\u9891\u901a\u8bdd');
+          endVideoCall(true);
+        });
       }
 
       function getMediaUnsupportedMessage() {
@@ -343,7 +348,12 @@
         socket.emit('video_call_accept', { room: callRoom.value, caller: 'teacher' });
         incomingStudentCall.value = null;
       }
-      function rejectStudentCall() { incomingStudentCall.value = null; Toast.info('\u5df2\u62d2\u7edd'); }
+      function rejectStudentCall() {
+        if (incomingStudentCall.value && socket) {
+          socket.emit('video_call_reject', { room: incomingStudentCall.value.room || AGORA_CHANNEL, caller: 'student', rejected_by: 'teacher' });
+        }
+        incomingStudentCall.value = null; Toast.info('\u5df2\u62d2\u7edd');
+      }
 
       // ===== 教师端 WebRTC =====
       function initTeacherVideo() {
@@ -362,6 +372,12 @@
           socket.emit('join', { room: videoRoom.value });
         });
         socket.on('video_call_ended', function(data) { if (!data || data.sender !== 'teacher') endTeacherVideo(true); });
+        socket.on('video_call_rejected', function(data) {
+          if (!data || data.caller !== 'teacher') return;
+          Toast.info('\u5bf9\u65b9\u5df2\u62d2\u7edd\u89c6\u9891\u901a\u8bdd');
+          // 未接通的呼叫直接清理，不产生通话情绪总结
+          endTeacherVideo(true, true);
+        });
       }
 
       async function startTeacherVideo(options) {
@@ -431,10 +447,15 @@
         }
       }
 
-      function rejectVideoCall() { incomingCall.value = null; Toast.info('\u5df2\u62d2\u7edd'); }
+      function rejectVideoCall() {
+        if (incomingCall.value && socket) {
+          socket.emit('video_call_reject', { room: incomingCall.value.room || AGORA_CHANNEL, caller: 'teacher', rejected_by: 'student' });
+        }
+        incomingCall.value = null; Toast.info('\u5df2\u62d2\u7edd');
+      }
 
-      async function endTeacherVideo(silent) {
-        await submitRealtimeCallSummary();
+      async function endTeacherVideo(silent, skipSummary) {
+        if (!skipSummary) await submitRealtimeCallSummary();
         stopAllRealtime();
         if (agoraTeacherClient) { agoraTeacherClient.leave().catch(function() {}); agoraTeacherClient = null; }
         if (teacherVideoTrack) { teacherVideoTrack.close(); teacherVideoTrack = null; }

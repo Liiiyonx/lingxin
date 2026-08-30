@@ -1,3 +1,5 @@
+import os
+
 from api import common
 from api.common import *  # noqa: F401,F403
 from api.common import api, logger, auth_required, role_required, log_action
@@ -104,12 +106,32 @@ def dashboard():
             for a in alert_result.get("items", [])
         ]
 
+        # 知识库文档数：优先读向量库文档级索引，未配置 key 时退回 docs/ 目录文件计数
+        kb_docs = 0
+        kb = common.knowledge_base
+        if kb is not None:
+            try:
+                kb_docs = len(getattr(kb, "_doc_index", {}) or {})
+            except Exception:
+                kb_docs = 0
+        if not kb_docs:
+            try:
+                docs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs")
+                if os.path.isdir(docs_dir):
+                    kb_docs = len([
+                        f for f in os.listdir(docs_dir)
+                        if os.path.isfile(os.path.join(docs_dir, f))
+                        and os.path.splitext(f)[1].lower() in {".pdf", ".txt", ".docx", ".doc", ".md", ".csv"}
+                    ])
+            except Exception:
+                kb_docs = 0
+
         return jsonify({
             "conversations": total_conversations,
             "emotions": total_emotions,
             "alerts_pending": pending_alerts,
             "alerts_resolved": resolved_alerts,
-            "knowledge_docs": 0,
+            "knowledge_docs": kb_docs,
             "emotion_distribution": emotion_dist,
             "risk_distribution": risk_distribution,
             "trend_data": trend_data,

@@ -540,6 +540,9 @@ def batch_organize():
     if len(conversations) > 50:
         return jsonify({"success": False, "message": "单次批量操作最多处理 50 条记录"}), 400
 
+    if not common.conversation_engine:
+        return jsonify({"success": False, "message": "AI 整理引擎未启用：请先配置 DASHSCOPE_API_KEY"}), 503
+
     results = []
     errors = []
 

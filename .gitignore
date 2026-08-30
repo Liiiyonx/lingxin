@@ -36,3 +36,4 @@ audio_samples/*.flac
 .vscode/
 .idea/
 .DS_Store
+gui-test-screenshots/

@@ -107,9 +107,9 @@ def main():
     # 全量校验密码哈希可匹配 123456
     pwd_mismatch = 0
     for s in students:
-        if not check_password_hash(s["password_hash"], "123456"):
+        if not s.get("password_hash") or not check_password_hash(s["password_hash"], "123456"):
             pwd_mismatch += 1
-    check(pwd_mismatch == 0, "全量密码哈希匹配 123456", f"不匹配={pwd_mismatch}")
+    check(pwd_mismatch == 0, "全量密码哈希匹配 123456", f"不匹配/缺失={pwd_mismatch}")
 
     section("5. 学生情绪/风险取值合法性")
     bad_emo = [s["student_id"] for s in students if s["emotion_status"] not in VALID_EMOTIONS]

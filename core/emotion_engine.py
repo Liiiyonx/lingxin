@@ -295,6 +295,24 @@ class EmotionRecognizer:
             }
         return None  # 需要LLM进一步分析
 
+    def _rule_emotion_guess(self, features: Dict[str, Any]) -> Dict[str, Any]:
+        """最后兜底：本地模型与 LLM 均不可用时，基于声学特征做保守判定，保证识别链路不中断。"""
+        rms = float(features.get("rms", 0) or 0)
+        energy_std = float(features.get("energy_std", 0) or 0)
+        if rms > 0.08 and energy_std > 0.02:
+            # 高能量 + 高波动：疑似激动/烦躁
+            emotion, intensity, confidence = "烦躁", 6, 0.55
+        else:
+            emotion, intensity, confidence = "正常", 3, 0.5
+        risk_level = "medium" if emotion in ("烦躁", "焦虑", "愤怒", "压抑") and intensity >= 6 else "low"
+        return {
+            "emotion": emotion,
+            "intensity": intensity,
+            "risk_level": risk_level,
+            "confidence": confidence,
+            "description": "本地模型与API均不可用，基于声学特征保守判定；建议配置 DASHSCOPE_API_KEY 或稍后重试",
+        }
+
     def recognize(self, audio_path: str) -> Dict[str, Any]:
         """
         单文件情感识别：真实模型（emotion2vec）→ 规则预判 → LLM 研判。
@@ -332,13 +350,19 @@ class EmotionRecognizer:
             logger.info("规则预判 [%s]: %s (跳过LLM)", audio_path, quick_result["emotion"])
             return quick_result
 
-        # 3. LLM 研判
-        result = self._analyze_with_llm(features)
+        # 3. LLM 研判；无 key 或调用失败时退回声学保守判定，保证接口永不 500
+        try:
+            result = self._analyze_with_llm(features)
+            llm_source = "llm"
+            logger.info("LLM识别 [%s]: %s (强度:%s)", audio_path, result["emotion"], result["intensity"])
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM 研判不可用 [%s]: %s，回退声学规则兜底", audio_path, exc)
+            result = self._rule_emotion_guess(features)
+            llm_source = "rule"
         result["source_file"] = audio_path
         result["features"] = features
         result["timestamp"] = datetime.now().isoformat()
-        result["_source"] = "llm"
-        logger.info("LLM识别 [%s]: %s (强度:%s)", audio_path, result["emotion"], result["intensity"])
+        result["_source"] = llm_source
         return result
 
     def _try_real_model(self, audio, sr: int) -> Optional[Dict[str, Any]]:

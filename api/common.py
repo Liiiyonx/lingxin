@@ -192,6 +192,16 @@ def init_services(app):
         knowledge_base = None
         rag_generator = None
 
+    # 会话引擎：谈心记录/上传文档 AI 整理依赖，无 API key 时保持 None（路由侧显式提示）
+    if api_key:
+        try:
+            conversation_engine = ConversationEngine(prompt_manager)
+        except Exception as e:
+            logger.warning("Conversation engine init skipped: %s", e)
+            conversation_engine = None
+    else:
+        conversation_engine = None
+
     logger.info("Services initialized")
 
     # 后台预热真实情绪模型（emotion2vec + FER），避免实时调用首次卡顿

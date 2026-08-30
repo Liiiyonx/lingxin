@@ -1144,6 +1144,7 @@
       async function loadMessageContacts() {
         try { var d = await API.get('/messages/contacts'); messageContacts.value = d.data || []; }
         catch (e) { console.warn('联系人列表加载失败', e); }
+        loadUnreadCount();
         if (currentUser.role === 'student' && selectedContact.value) {
           loadContactPresence(selectedContact.value.id);
         }
@@ -1187,7 +1188,12 @@
       }
 
       async function loadUnreadCount() {
-        try { var d = await API.get('/messages/unread'); var c = d.data ? d.data.unread_count : 0; studentUnreadCount.value = c; }
+        try {
+          var d = await API.get('/messages/unread');
+          var c = d.data ? d.data.unread_count : 0;
+          if (currentUser.role === 'student') studentUnreadCount.value = c;
+          else teacherUnreadCount.value = c;
+        }
         catch (e) { console.warn('未读消息数加载失败', e); }
       }
 
