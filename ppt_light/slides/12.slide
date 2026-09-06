@@ -1,0 +1,70 @@
+<Slide style={{ width: 1280, height: 720, background: '#FFFFFF', position: 'relative', overflow: 'hidden' }}>
+  <Box style={{ position: 'absolute', top: -100, left: '40%', width: 600, height: 600, borderRadius: 9999, background: 'radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 60%)' }} />
+
+  <Box style={{ position: 'absolute', top: 40, left: 80, flexDirection: 'row', alignItems: 'baseline', gap: 16 }}>
+    <Text style={{ fontSize: 40, fontWeight: 'bold', color: '#7C3AED', lineHeight: 1 }}>05</Text>
+    <Box style={{ flexDirection: 'column', gap: 4 }}>
+      <Text style={{ fontSize: 22, color: '#0F172A', fontWeight: 'bold' }}>学生端 + 量化成果</Text>
+      <Text style={{ fontSize: 12, color: '#64748B', letterSpacing: 2 }}>STUDENT PORTAL · METRICS & CLOSING</Text>
+    </Box>
+  </Box>
+
+  {/* 左 学生端能力 */}
+  <Box style={{ position: 'absolute', top: 110, left: 80, flexDirection: 'column', gap: 12, width: 580 }}>
+    <Text style={{ fontSize: 30, color: '#0F172A', fontWeight: 'bold' }}>每位学生一个<Text style={{ color: '#7C3AED' }}>求助入口</Text></Text>
+    <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 4 }}>低门槛、可追溯、有 AI 陪伴</Text>
+
+    {[
+      { ic: '📊', t: '标准化心理测评', d: 'PHQ-9 / GAD-7 等量表,自动评分 + 风险提示' },
+      { ic: '📅', t: '预约咨询', d: '在线预约老师 → 自动确认待办 → 沉淀谈心记录' },
+      { ic: '💬', t: '7×24 求助通道', d: '联系老师 → AI 分身立即响应 / 老师上线接入' },
+      { ic: '📚', t: '知识库自我学习', d: '心理科普文章检索阅读,RAG 混合检索' },
+    ].map(({ ic, t, d }, i) => (
+      <Box key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, background: '#F8FAFC', borderRadius: 6, borderLeft: '3px solid #7C3AED', gap: 14 }}>
+        <Box style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(168,85,247,0.15)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Text style={{ fontSize: 20 }}>{ic}</Text>
+        </Box>
+        <Box style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, color: '#0F172A', fontWeight: 'bold' }}>{t}</Text>
+          <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{d}</Text>
+        </Box>
+      </Box>
+    ))}
+  </Box>
+
+  {/* 右 量化成果 */}
+  <Box style={{ position: 'absolute', top: 110, right: 80, width: 420, flexDirection: 'column', gap: 14 }}>
+    <Text style={{ fontSize: 14, color: '#64748B', letterSpacing: 4 }}>METRICS · 平台验证</Text>
+
+    {[
+      { n: '80', u: '项', t: '自动化测试', sub: '全部通过' },
+      { n: '61', u: '项', t: '数据完整性校验', sub: '全部通过' },
+      { n: '73.33', u: '%', t: '文本情绪识别准确率', sub: '公开数据集' },
+      { n: '600', u: '名', t: '演示规模覆盖', sub: '全校学生' },
+    ].map(({ n, u, t, sub }, i) => (
+      <Box key={i} style={{ padding: '14px 20px', background: '#F8FAFC', borderRadius: 6, flexDirection: 'row', alignItems: 'baseline', gap: 10, borderRight: '3px solid #7C3AED' }}>
+        <Box style={{ flexDirection: 'row', alignItems: 'baseline', minWidth: 150 }}>
+          <Text style={{ fontSize: 56, fontWeight: 'bold', color: '#7C3AED', lineHeight: 1 }}>{n}</Text>
+          <Text style={{ fontSize: 22, color: '#EC4899', fontWeight: 'bold' }}>{u}</Text>
+        </Box>
+        <Box style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, color: '#0F172A', fontWeight: 'bold' }}>{t}</Text>
+          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{sub}</Text>
+        </Box>
+      </Box>
+    ))}
+  </Box>
+
+  {/* 收尾 */}
+  <Box style={{ position: 'absolute', bottom: 60, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+    <Box style={{ width: 50, height: 2, background: '#7C3AED' }} />
+    <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#0F172A', textAlign: 'center', letterSpacing: 1 }}>聆心,让每一份情绪都被看见</Text>
+    <Box style={{ width: 50, height: 2, background: '#EC4899' }} />
+  </Box>
+
+  <Box style={{ position: 'absolute', bottom: 30, right: 80, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <Text style={{ fontSize: 13, color: '#64748B' }}>12</Text>
+    <Box style={{ width: 30, height: 1, background: '#64748B' }} />
+    <Text style={{ fontSize: 13, color: '#64748B' }}>12</Text>
+  </Box>
+</Slide>

@@ -1,0 +1,29 @@
+<Slide style={{ width: 1280, height: 720, background: '#FFFFFF', position: 'relative', overflow: 'hidden' }}>
+  {/* 中心巨型光晕 */}
+  <Box style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 800, height: 800, borderRadius: 9999, background: 'radial-gradient(circle, rgba(168,85,247,0.12) 0%, rgba(236,72,153,0.06) 40%, transparent 70%)' }} />
+
+  {/* 顶部小角标 */}
+  <Box style={{ position: 'absolute', top: 50, left: 80, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+    <Box style={{ width: 8, height: 8, borderRadius: 9999, background: '#7C3AED' }} />
+    <Text style={{ fontSize: 13, color: '#64748B', letterSpacing: 4 }}>PART 01 · 5</Text>
+  </Box>
+
+  {/* 巨型渐变数字 */}
+  <Box style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -60%)', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+    <Text style={{ fontSize: 280, fontWeight: 'bold', lineHeight: 1, backgroundImage: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)', backgroundClip: 'text', color: 'transparent' }}>01</Text>
+    <Text style={{ fontSize: 56, color: '#0F172A', fontWeight: 'bold', lineHeight: 1 }}>辅导员工作台 + 情绪网络图</Text>
+    <Text style={{ fontSize: 16, color: '#64748B', letterSpacing: 6 }}>COUNSELOR DASHBOARD</Text>
+  </Box>
+
+  {/* 底部引语 */}
+  <Box style={{ position: 'absolute', bottom: 60, left: 0, right: 0, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+    <Text style={{ fontSize: 14, color: '#64748B', fontStyle: 'italic' }}>"辅导员登录后,今日工作台自动汇总待办;情绪网络图以一张全局视图呈现全班情绪聚类。"</Text>
+  </Box>
+
+  {/* 页脚 */}
+  <Box style={{ position: 'absolute', bottom: 30, right: 80, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <Text style={{ fontSize: 13, color: '#64748B' }}>03</Text>
+    <Box style={{ width: 30, height: 1, background: '#64748B' }} />
+    <Text style={{ fontSize: 13, color: '#64748B' }}>12</Text>
+  </Box>
+</Slide>

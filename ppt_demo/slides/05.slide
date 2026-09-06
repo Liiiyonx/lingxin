@@ -1,0 +1,86 @@
+<Slide style={{ width: 1280, height: 720, background: '#0B0B12', position: 'relative', overflow: 'hidden' }}>
+  {/* 章节角标 */}
+  <Box style={{ position: 'absolute', top: 40, left: 80, flexDirection: 'row', alignItems: 'baseline', gap: 16 }}>
+    <Text style={{ fontSize: 56, fontWeight: 'bold', color: '#A855F7', lineHeight: 1 }}>03</Text>
+    <Box style={{ flexDirection: 'column', gap: 4 }}>
+      <Text style={{ fontSize: 24, color: '#F5F5F7', fontWeight: 'bold' }}>视频通话 · 多模态情绪感知</Text>
+      <Text style={{ fontSize: 12, color: '#9CA3AF', letterSpacing: 2 }}>VIDEO CALL · MULTIMODAL EMOTION FUSION</Text>
+    </Box>
+  </Box>
+
+  {/* 主标题 */}
+  <Box style={{ position: 'absolute', top: 130, left: 80, right: 80, flexDirection: 'column', gap: 6 }}>
+    <Text style={{ fontSize: 36, color: '#F5F5F7', fontWeight: 'bold', lineHeight: 1.1 }}>
+      三路信号 <Text style={{ color: '#A855F7' }}>融合</Text>判断
+    </Text>
+    <Text style={{ fontSize: 14, color: '#9CA3AF' }}>
+      通话中实时显示,挂断后自动生成情绪总结回写学生档案
+    </Text>
+  </Box>
+
+  {/* 中央流程 */}
+  <Box style={{ position: 'absolute', top: 230, left: 80, right: 80, flexDirection: 'column', gap: 16 }}>
+    {/* 输入三列 */}
+    <Box style={{ flexDirection: 'row', gap: 20 }}>
+      {[
+        { ic: '🎤', t: '语音韵律', m: 'emotion2vec', d: '语调 / 节奏 / 强度' },
+        { ic: '👁', t: '微表情', m: 'face-api', d: 'AU 单元 / 面部活动' },
+        { ic: '🎯', t: '后端模型', m: '多模态 LLM', d: '上下文 / 语义风险' },
+      ].map(({ ic, t, m, d }, i) => (
+        <Box key={i} style={{ flex: 1, padding: 16, background: '#15151F', borderRadius: 8, border: '1px solid #2A2A3E', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+          <Box style={{ width: 44, height: 44, borderRadius: 9999, background: 'rgba(168,85,247,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 22 }}>{ic}</Text>
+          </Box>
+          <Text style={{ fontSize: 18, color: '#F5F5F7', fontWeight: 'bold' }}>{t}</Text>
+          <Text style={{ fontSize: 12, color: '#A855F7', letterSpacing: 1 }}>{m}</Text>
+          <Text style={{ fontSize: 12, color: '#9CA3AF' }}>{d}</Text>
+        </Box>
+      ))}
+    </Box>
+
+    {/* 箭头 */}
+    <Box style={{ alignItems: 'center', padding: 0 }}>
+      <Text style={{ fontSize: 22, color: '#A855F7' }}>▼ 加权融合 ▼</Text>
+    </Box>
+
+    {/* 输出:情绪面板 */}
+    <Box style={{ padding: 18, background: 'linear-gradient(135deg, rgba(168,85,247,0.1) 0%, rgba(236,72,153,0.1) 100%)', borderRadius: 8, border: '1px solid #A855F7', flexDirection: 'row', gap: 20, alignItems: 'center' }}>
+      <Box style={{ flexDirection: 'column', gap: 4, alignItems: 'center', paddingRight: 18, borderRight: '1px solid #2A2A3E' }}>
+        <Text style={{ fontSize: 48, fontWeight: 'bold', color: '#EF4444', lineHeight: 1 }}>😟</Text>
+        <Text style={{ fontSize: 20, color: '#F5F5F7', fontWeight: 'bold' }}>焦虑 / 压抑</Text>
+        <Text style={{ fontSize: 12, color: '#9CA3AF' }}>置信度 87%</Text>
+      </Box>
+      <Box style={{ flex: 1, flexDirection: 'column', gap: 10 }}>
+        {[
+          ['情绪强度', 72, '#EC4899'],
+          ['风险等级', 64, '#EF4444'],
+          ['微表情指标', 81, '#F59E0B'],
+        ].map(([l, v, c], i) => (
+          <Box key={i} style={{ flexDirection: 'column', gap: 3 }}>
+            <Box style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 12, color: '#F5F5F7' }}>{l}</Text>
+              <Text style={{ fontSize: 12, color: c, fontWeight: 'bold' }}>{v}%</Text>
+            </Box>
+            <Box style={{ width: '100%', height: 5, background: '#0B0B12', borderRadius: 3, overflow: 'hidden' }}>
+              <Box style={{ width: `${v}%`, height: '100%', background: c, borderRadius: 3 }} />
+            </Box>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  </Box>
+
+  {/* 底部说明 */}
+  <Box style={{ position: 'absolute', bottom: 50, left: 80, right: 80, justifyContent: 'center' }}>
+    <Text style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center' }}>
+      挂断后自动生成<Text style={{ color: '#A855F7' }}> 通话情绪总结 </Text>,风险结论回写学生档案 + 同步情绪网络图
+    </Text>
+  </Box>
+
+  {/* 页脚 */}
+  <Box style={{ position: 'absolute', bottom: 30, right: 80, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <Text style={{ fontSize: 13, color: '#9CA3AF' }}>05</Text>
+    <Box style={{ width: 30, height: 1, background: '#9CA3AF' }} />
+    <Text style={{ fontSize: 13, color: '#9CA3AF' }}>07</Text>
+  </Box>
+</Slide>

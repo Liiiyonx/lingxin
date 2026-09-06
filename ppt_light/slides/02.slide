@@ -1,0 +1,33 @@
+<Slide style={{ width: 1280, height: 720, background: '#FFFFFF', position: 'relative', overflow: 'hidden' }}>
+  {/* 左上 CONTENTS */}
+  <Box style={{ position: 'absolute', top: 60, left: 80, flexDirection: 'column', gap: 18 }}>
+    <Text style={{ fontSize: 14, color: '#64748B', letterSpacing: 6 }}>CONTENTS</Text>
+    <Text style={{ fontSize: 96, fontWeight: 'bold', color: '#0F172A', lineHeight: 1 }}>目录</Text>
+    <Box style={{ width: 80, height: 4, background: '#7C3AED', marginTop: 12 }} />
+  </Box>
+
+  {/* 五个章节 */}
+  <Box style={{ position: 'absolute', right: 120, top: 100, width: 600, flexDirection: 'column', gap: 22 }}>
+    {[
+      ['01', '辅导员工作台 + 情绪网络图', 'Counselor Dashboard'],
+      ['02', '老师端 · AI 数字人', 'AI Digital Human'],
+      ['03', '视频通话 · 多模态情绪', 'Video Call'],
+      ['04', '危机闭环 · 工单流转', 'Crisis Workflow'],
+      ['05', '学生端 · 测评与求助', 'Student Portal'],
+    ].map(([num, cn, en], i) => (
+      <Box key={i} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 28, paddingBottom: 16, borderBottom: '1px solid #E2E8F0' }}>
+        <Text style={{ fontSize: 48, fontWeight: 'bold', color: '#7C3AED', lineHeight: 1, width: 80 }}>{num}</Text>
+        <Box style={{ flexDirection: 'column', gap: 6 }}>
+          <Text style={{ fontSize: 22, color: '#0F172A', fontWeight: 'bold' }}>{cn}</Text>
+          <Text style={{ fontSize: 13, color: '#64748B', letterSpacing: 1 }}>{en}</Text>
+        </Box>
+      </Box>
+    ))}
+  </Box>
+
+  <Box style={{ position: 'absolute', bottom: 30, right: 80, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <Text style={{ fontSize: 13, color: '#64748B' }}>02</Text>
+    <Box style={{ width: 30, height: 1, background: '#64748B' }} />
+    <Text style={{ fontSize: 13, color: '#64748B' }}>12</Text>
+  </Box>
+</Slide>

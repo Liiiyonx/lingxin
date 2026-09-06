@@ -1,0 +1,24 @@
+<Slide style={{ width: 1280, height: 720, background: '#0B0B12', position: 'relative', overflow: 'hidden' }}>
+  {/* 背景渐变光晕 */}
+  <Box style={{ position: 'absolute', top: -200, right: -200, width: 700, height: 700, borderRadius: 9999, background: 'radial-gradient(circle, rgba(168,85,247,0.35) 0%, transparent 60%)' }} />
+  <Box style={{ position: 'absolute', bottom: -250, left: -100, width: 600, height: 600, borderRadius: 9999, background: 'radial-gradient(circle, rgba(236,72,153,0.18) 0%, transparent 60%)' }} />
+
+  {/* 顶部小标 */}
+  <Box style={{ position: 'absolute', top: 60, left: 80, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+    <Box style={{ width: 8, height: 8, borderRadius: 9999, background: '#A855F7' }} />
+    <Text style={{ fontSize: 14, color: '#9CA3AF', letterSpacing: 4 }}>TINGXIN · 高校心理预警平台</Text>
+  </Box>
+
+  {/* 主标题 大字 */}
+  <Box style={{ position: 'absolute', left: 80, top: 200, flexDirection: 'column', gap: 16 }}>
+    <Text style={{ fontSize: 220, fontWeight: 'bold', lineHeight: 1, backgroundImage: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)', backgroundClip: 'text', color: 'transparent', letterSpacing: -8 }}>聆心</Text>
+    <Text style={{ fontSize: 28, color: '#F5F5F7', fontWeight: 'normal', marginTop: 12 }}>辅导员减负 · 学生被看见 · 风险不漏一人</Text>
+    <Text style={{ fontSize: 16, color: '#9CA3AF', marginTop: 8, letterSpacing: 2 }}>基于大模型智能体的心理预警与 AI 陪伴一体化平台</Text>
+  </Box>
+
+  {/* 右下底标 */}
+  <Box style={{ position: 'absolute', bottom: 50, right: 80, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+    <Box style={{ width: 60, height: 2, background: '#A855F7' }} />
+    <Text style={{ fontSize: 14, color: '#9CA3AF' }}>演示视频 · 4 分钟</Text>
+  </Box>
+</Slide>
